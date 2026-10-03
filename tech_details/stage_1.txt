@@ -312,7 +312,7 @@ Legend: [x] done   [ ] open
     check passes.
 [x] Extra (not in original plan): favicon replaced — Vite logo -> "G"
     monogram in brand colors (public/favicon.svg).
-[ ] Git: all work pushed to main, tag v0.1-foundation pushed
+[x] Git: all work pushed to main, tag v0.1-foundation pushed
     (only on the user's command).
 
 Known issue

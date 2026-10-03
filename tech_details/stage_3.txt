@@ -28,6 +28,15 @@ Run locally first (npm run dev), then again on the live GitHub Pages URL.
 [ ] 13 Cart empty after purchase.
 [ ] 14 Refresh on /confirmation shows the same order (no new order, no
        error). (Purchase-event de-dup is tested in Stage 5.)
+Theme:
+[ ] 15 With no saved choice the site follows the OS theme (switch macOS
+       Appearance while the page is open -> site follows live).
+[ ] 16 Toggle switches light <-> dark; choice survives refresh and
+       navigation; no flash of the wrong theme on load (also on the live
+       site, hard refresh).
+[ ] 17 Every page (home, product, cart incl. empty state, checkout incl.
+       error messages, confirmation, 404) is readable in dark theme;
+       contrast AA checked with DevTools / Lighthouse in both themes.
 Extra: /checkout with empty cart redirects to /cart; unknown route -> 404;
 back/forward buttons work; keyboard-only navigation works; refresh on
 /product/cream_001 and /cart works on the LIVE site.
@@ -38,19 +47,21 @@ pass with zero errors.
 
 3.2 Git and GitHub repository
 -----------------------------
-1. Check .gitignore: node_modules, dist, .env, *.local, .DS_Store,
-   .idea are ignored. Decide about tech_details/ (recommended: ignore the
-   large images, keep the .md/.txt planning files).
-2. git init, git add, first commit ("Glow Care demo store — no analytics").
-3. Create the GitHub repository (public — GitHub Pages is free for public
-   repos), e.g. "skin-care-demo":
-     - GitHub CLI: `brew install gh`, `gh auth login`, then
-       `gh repo create skin-care-demo --public --source=. --push`
-       (gh is NOT installed on this machine yet), or
-     - GitHub web UI: New repository -> then `git remote add origin ...`
-       and `git push -u origin main`.
-4. Tag the milestone: `git tag v1.0-no-analytics` and push the tag, so the
-   analytics-free version is always easy to return to and compare against.
+Git has been used since Stage 1 (workflow in Stage 1 §4); all Stage 1–2
+work is already on main. This stage only prepares the repo for Pages.
+0. NO commit / push / tag by the AI without the user's command
+   (Stage 1 §4 RULE).
+1. Keep committing directly to main. Fixes found during testing (3.1) are
+   committed as `fix: ...`.
+2. Make sure the repository is public (GitHub Pages is free for public
+   repos).
+3. Note: the deploy workflow (3.3) triggers on every push to main, so the
+   FIRST deployment happens as soon as the workflow file is pushed. From
+   that moment on, every push to main updates the live site — only push
+   commits that leave the site working.
+4. When all checks pass: tag the milestone `v1.0-no-analytics` and push
+   the tag, so the analytics-free version is always easy to return to and
+   compare against.
 
 
 3.3 Deployment — GitHub Pages via GitHub Actions
@@ -96,6 +107,8 @@ GitHub repo; base path "/", SPA rewrite instead of 404.html).
 3.4 Basic README (Part A version, English)
 ------------------------------------------
 - What the project is (educational demo store; analytics added in Part B).
+- Light / dark theme: follows the OS, header toggle, stored in
+  localStorage "glowcare_theme".
 - Technologies used.
 - Install Node.js LTS (nodejs.org) and check `node -v`, `npm -v`.
 - npm install / npm run dev (-> http://localhost:5173) / npm run build
@@ -109,6 +122,6 @@ The README is extended with all analytics topics in Stage 5.
 Definition of done (= Part A milestone)
 ---------------------------------------
 - All functional checks pass locally AND on the live URL.
-- Code is on GitHub, tagged v1.0-no-analytics.
+- All work pushed to main, tagged v1.0-no-analytics.
 - Every push to main redeploys automatically; site is live on HTTPS.
 - Still no analytics code anywhere in the repository.

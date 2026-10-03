@@ -68,16 +68,39 @@ src/context/CartContext.tsx
 src/hooks/useCart.ts — throws a helpful error if used outside the provider.
 
 
-2.4 Layout components
+2.4 Theme (light / dark)
+------------------------
+src/context/ThemeContext.tsx
+  preference: "system" | "light" | "dark"   (initial value read from
+                                              localStorage "glowcare_theme",
+                                              absent -> "system")
+  resolvedTheme: "light" | "dark"           (system -> matchMedia result)
+  setPreference(p): saves to localStorage ("system" removes the key) and
+  sets document.documentElement.dataset.theme = resolvedTheme.
+  While preference = "system", listen to matchMedia("(prefers-color-
+  scheme: dark)") change events so the site follows the OS live.
+  Must agree with the pre-paint script in index.html (Stage 1) — same key,
+  same logic — so React never flips the theme after load.
+src/hooks/useTheme.ts — throws a helpful error outside the provider.
+ThemeToggle
+  icon button in the header: Moon in light theme, Sun in dark theme;
+  click toggles light <-> dark (an explicit choice). aria-label
+  "Увімкнути темну тему" / "Увімкнути світлу тему", aria-pressed.
+  (Optional: long-press / small menu with "Як у системі" to go back to
+  system mode; otherwise document that clearing site data resets it.)
+
+
+2.5 Layout components
 ---------------------
 Header      logo "Glow Care" (Link to /), nav: Головна, Каталог (/#catalog),
-            Кошик; cart icon (lucide ShoppingBag) with live count badge;
-            mobile: burger menu or compact nav.
+            Кошик; ThemeToggle; cart icon (lucide ShoppingBag) with live
+            count badge; mobile: burger menu or compact nav (toggle stays
+            visible outside the burger).
 Footer      brand line, demo disclaimer ("Навчальний демо-магазин. Реальні
             замовлення та оплати не здійснюються."), year.
 
 
-2.5 Pages
+2.6 Pages
 ---------
 HomePage
   - Hero: pill label "Догляд для шкіри", serif H1 (e.g. "Ніжний догляд для
@@ -131,17 +154,54 @@ ConfirmationPage (/confirmation)
 NotFoundPage — simple 404 with link home.
 
 
-2.6 Styling
+2.7 Styling
 -----------
 - global.css tokens + CSS Modules per component (Header.module.css, ...).
+- Colors ONLY via tokens (var(--color-...)) — no hex values in CSS
+  Modules, so every component works in both themes automatically.
+- Dark theme specifics:
+    * Product PNGs have light studio backgrounds: keep them on the
+      --color-cream tile with rounded corners (they read as "cards"), and
+      optionally filter: brightness(0.92) in dark to reduce glare.
+    * Hero photo: subtle dark gradient overlay in dark theme so the H1
+      stays readable; never invert or recolor photos.
+    * Pill buttons swap to light beige with dark text (via --color-accent /
+      --color-on-accent), as in the token table.
+    * Shadows are weaker; use --color-border to separate cards instead.
+    * Form fields: background --color-surface, border --color-border,
+      error text --color-error; check focus ring visibility in both themes.
+- Theme switch: short transition on background-color / color (~200ms),
+  disabled under prefers-reduced-motion.
 - Responsive: grid 4 cols desktop / 2 tablet / 1 mobile; checkout two
   columns -> stacked on mobile; header collapses on mobile.
 - Accessible: visible focus styles, buttons are <button>, links are <a>,
   all icon-only buttons have aria-label in Ukrainian, alt text on images,
-  color contrast AA.
+  color contrast AA in BOTH themes.
 - Use stable, semantic markup and meaningful class names / ids (e.g.
   id="catalog") — this makes adding data-gtm attributes in Stage 4 a
   small, mechanical change.
+
+
+2.8 Git (workflow from Stage 1 §4)
+----------------------------------
+- All commits go directly to main (no branches, no PRs).
+- NO commit / push / tag by the AI without the user's command
+  (Stage 1 §4 RULE). The list below is a proposal, not an instruction to
+  commit.
+- Suggested commit sequence (one or more commits each):
+    feat: shop types and product data
+    feat: base-path aware router and Link
+    feat: cart context with localStorage persistence
+    feat: theme context and toggle
+    feat: header and footer layout
+    feat: home page (hero, catalog, benefits)
+    feat: product details page
+    feat: cart page with empty state
+    feat: checkout form with validation
+    feat: order confirmation page
+    style: responsive layout and dark theme polish
+- Push main to origin regularly. (No live deploy exists yet in this
+  stage, so pushing work-in-progress commits is safe.)
 
 
 Definition of done
@@ -153,5 +213,8 @@ Definition of done
   (`npm run build -- --base=/skin-care-demo/` + `npm run preview`):
   links, images and refresh on a deep URL behave correctly.
 - No console errors; `npm run build` and `npm run lint` clean.
-- Looks good at 375px, 768px, 1280px widths.
+- All work pushed to main; tag v0.2-website pushed.
+- Looks good at 375px, 768px, 1280px widths, in light AND dark theme.
+- Theme follows the OS by default, toggle works and persists after
+  refresh, no flash of the wrong theme on load.
 - grep for "dataLayer", "gtm", "gtag", "fbq" in src/ returns nothing.

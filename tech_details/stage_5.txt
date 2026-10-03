@@ -3,7 +3,10 @@ STAGE 5 — GTM / GA4 / META PIXEL DOCS, ANALYTICS TESTING, FINAL DELIVERY
 
 Prerequisite
 ------------
-Stage 4 merged and live on GitHub Pages.
+Stage 4 done and live on GitHub Pages (tag v1.1-datalayer).
+Git (workflow from Stage 1 §4): NO commit / push / tag by the AI without
+the user's command. Commits go directly to main; docs commits as
+"docs: ...", any code fixes from analytics testing as "fix: ...".
 
 Goal
 ----
@@ -195,7 +198,8 @@ purchase de-dup helper.)
 [ ] Testing checklist               (docs/testing-checklist.md)
 [ ] Troubleshooting                 (docs/troubleshooting.md)
 [ ] Live demo URL (GitHub Pages)
-[ ] Git tags: v1.0-no-analytics, v2.0-analytics
+[ ] Git tags: v0.1-foundation, v0.2-website, v1.0-no-analytics,
+    v1.1-datalayer, v2.0-analytics; all work pushed to main
 
 
 Definition of done
@@ -205,4 +209,5 @@ Definition of done
   following only the docs. No real IDs; only placeholders.
 - All functional checks pass; analytics checks 1–5, 8–10 pass; 6–7 either
   verified with real IDs or explicitly marked as learner steps.
-- Final version live on GitHub Pages and tagged v2.0-analytics.
+- All work pushed to main; final version live on GitHub Pages and
+  tagged v2.0-analytics.

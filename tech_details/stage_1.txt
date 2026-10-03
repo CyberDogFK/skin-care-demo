@@ -93,6 +93,23 @@ d) Privacy by design from day one: the checkout form data is validated
 e) Hosting: GitHub Pages, built and deployed by a GitHub Actions workflow
    (free, HTTPS). Details in Stage 3.
 
+f) Light + dark theme, CSS-variable based:
+   - All colors are design tokens on :root (light = default). The dark set
+     overrides the same token names; components never hardcode colors, so
+     they work in both themes with no per-component dark CSS (except a few
+     image tweaks).
+   - Default = follow the OS (prefers-color-scheme). A header toggle lets
+     the user pick light / dark; the choice is saved in localStorage
+     "glowcare_theme" ("light" | "dark"; absent = system).
+   - The active theme is set as <html data-theme="light|dark"> by a tiny
+     inline script in index.html BEFORE first paint, so there is no
+     flash of the wrong theme on load / refresh.
+   - `color-scheme: light dark` so native form controls, scrollbars and
+     autofill match the theme.
+
+g) Git from the very first task, through all stages (see section 4).
+   Deployment to GitHub Pages is NOT part of this — it stays in Stage 3.
+
 Decisions deferred to Part B (Stage 4): page_view strategy, GTM ID
 configuration via VITE_GTM_ID, dataLayer utility, data-gtm attributes.
 
@@ -118,10 +135,13 @@ configuration via VITE_GTM_ID, dataLayer utility, data-gtm attributes.
       shop.ts                  Product, CartItem, Order, DeliveryMethod
     context/
       CartContext.tsx          CartProvider (useReducer + localStorage)
+      ThemeContext.tsx         ThemeProvider (system / light / dark)
     hooks/
       useCart.ts               typed access to the cart context
+      useTheme.ts              typed access to the theme context
     components/
-      Header.tsx               logo, nav, cart icon + count
+      Header.tsx               logo, nav, theme toggle, cart icon + count
+      ThemeToggle.tsx          sun / moon icon button
       Footer.tsx
       Hero.tsx
       ProductCard.tsx
@@ -170,13 +190,71 @@ react-facebook-pixel — never, even in Part B), a test runner.
 tests are wanted.)
 
 
-4. Tasks in this stage
+4. Git workflow (applies to ALL stages)
+--------------------------------------
+Repository: git@github.com:CyberDogFK/skin-care-demo.git (already set up).
+
+!!! RULE FOR THE AI ASSISTANT (Claude) — HIGHEST PRIORITY !!!
+  NO COMMIT IS DONE BY THE AI WITHOUT THE USER'S EXPLICIT COMMAND.
+  The same applies to `git push`, `git tag` and any other command that
+  changes git history or the remote (amend, reset, rebase, revert,
+  force-push).
+  - The AI only edits files. When a piece of work is ready, it STOPS,
+    reports what changed, proposes a commit message, and waits.
+  - A command for one commit is not permission for the next one.
+  - Every "commit", "push" or "tag" step written in these stage files
+    means "propose it and wait for the user's command" — never do it
+    automatically.
+  - Read-only git commands (status, diff, log, show) are always allowed.
+
+Branch
+  Only one branch: main. No feature/stage branches, no Pull Requests.
+  All work is committed directly to main and pushed to origin/main.
+  From Stage 3 on, every push to main redeploys the live site, so every
+  pushed commit must leave the site working (half-finished work stays
+  local until it works, or is hidden from the UI).
+
+Commits
+  - Small, focused commits — one logical change each (e.g. "add cart
+    reducer", not "stage 2 work"). Propose a commit whenever something
+    works; the user decides when it is made (see RULE above).
+  - Conventional Commits style messages, English, imperative:
+      feat: add product catalog grid
+      fix: keep cart quantity at minimum 1
+      style: dark theme tokens for checkout form
+      refactor: / docs: / chore: / test:
+  - Before each commit: `npm run lint` and `npm run build` pass
+    (optional later: a pre-commit hook; not required now).
+  - Never commit: node_modules, dist, .env, large original images.
+
+Pushing
+  - `git push origin main` at least at the end of every working session
+    (backup + visible progress), and always at the end of a stage.
+  - Before pushing, review what goes out: `git log origin/main..main`
+    and `git diff origin/main`.
+
+Tags (milestones)
+  v0.1-foundation       end of Stage 1
+  v0.2-website          end of Stage 2
+  v1.0-no-analytics     end of Stage 3 (live site, no tracking)
+  v1.1-datalayer        end of Stage 4
+  v2.0-analytics        end of Stage 5 (final delivery)
+  git tag <name> && git push origin <name>
+
+
+5. Tasks in this stage
 ----------------------
+[ ] Git: commit the current planning changes on main and push
+    (only on the user's command).
+[ ] Git: review .gitignore — add .env, .env.*.local (keep .env.example
+    committed), and the large originals in tech_details/ (*.png, *.PNG,
+    *.jpg) if they should not live in the repo; untrack already-committed
+    ones with `git rm --cached` if needed.
 [ ] npm install lucide-react
 [ ] Remove template leftovers: src/App.css, src/assets/react.svg,
     src/assets/vite.svg, src/assets/hero.png, public/icons.svg, demo App.tsx.
-[ ] Replace src/index.css with src/styles/global.css (light theme only —
-    remove the dark "prefers-color-scheme" block; brand is beige/cream).
+[ ] Replace src/index.css with src/styles/global.css (drop the template's
+    dark block; rebuild light + dark from the brand tokens below).
 [ ] Create the folder structure above with empty/stub files.
 [ ] Copy & optimize images from tech_details/ into src/assets/
     (convert PNG -> JPG/WebP, ~800px for products, ~1600px for hero, so each
@@ -184,17 +262,41 @@ tests are wanted.)
 [ ] index.html: lang="uk", <title>Glow Care — догляд за шкірою</title>,
     meta description, Google Fonts (serif for headings, e.g. "Cormorant
     Garamond" or "Lora"; sans for body, e.g. "Inter" — both support Cyrillic).
-[ ] Define design tokens in global.css:
-      --color-bg #F7F2EC, --color-surface #FFFFFF, --color-cream #EFE6DC,
-      --color-text #2B2420, --color-muted #7A6E66, --color-accent #3A2E28,
-      --radius, --shadow, spacing scale, breakpoints 640 / 960 px.
+[ ] Define design tokens in global.css (same names in both themes):
+                         light (:root)     dark
+      --color-bg         #F7F2EC           #1B1613   warm espresso, not black
+      --color-surface    #FFFFFF           #251F1B
+      --color-cream      #EFE6DC           #2F2823   image tiles, pills
+      --color-border     #E4D9CD           #3D342E
+      --color-text       #2B2420           #F2EAE1
+      --color-muted      #7A6E66           #B5A79B
+      --color-accent     #3A2E28           #E9D9C6   primary pill buttons
+      --color-on-accent  #FFFFFF           #2B2420   text on primary buttons
+      --color-success    #3F7A4F           #7CC08E
+      --color-error      #B3261E           #F2A49C
+      --shadow           soft brown        darker, lower opacity
+      + --radius, spacing scale, breakpoints 640 / 960 px.
+    Dark tokens are applied by:
+      :root[data-theme="dark"] { ... }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) { ... }   /* fallback if JS off */
+      }
+    All text/background pairs must meet WCAG AA in BOTH themes (final hex
+    values may be tuned during Stage 2 to pass).
+[ ] index.html: inline pre-paint theme script (reads "glowcare_theme",
+    else matchMedia, sets data-theme on <html>; wrapped in try/catch) and
+    two <meta name="theme-color"> tags with media="(prefers-color-scheme:
+    light|dark)".
 [ ] Make sure tech_details/ is not part of the build (it is outside src/
     and public/, so Vite ignores it).
 [ ] `npm run dev`, `npm run build`, `npm run lint` all pass.
+[ ] Git: all work pushed to main, tag v0.1-foundation pushed.
 
 Definition of done
 ------------------
 - Plan approved.
+- Work committed in small commits on main, pushed, tagged v0.1-foundation.
 - Clean scaffold builds and lints with zero errors.
-- Folder structure and tokens in place; images optimized and imported.
+- Folder structure and tokens in place (light + dark); images optimized
+  and imported.
 - No analytics-related files or code exist.

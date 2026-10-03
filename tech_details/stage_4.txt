@@ -5,8 +5,14 @@ Prerequisite
 ------------
 Stage 3 milestone reached: the store is live on GitHub Pages, all
 functional checks pass, tag v1.0-no-analytics exists.
-Work on a branch (e.g. `feature/analytics`) and merge into main when this
-stage's definition of done is met, so the live site keeps working.
+Git (workflow from Stage 1 §4): NO commit / push / tag by the AI without
+the user's command. Commits go directly to main. Every push
+redeploys the live site, so push only commits where the store still works
+(analytics pushes without GTM are harmless to users, but a broken build or
+crashing component is not). Suggested commits: "feat: typed dataLayer utility",
+"feat: GTM injection plugin", "feat: track cart events", "feat: purchase
+de-duplication", "feat: data-gtm attributes", "ci: pass VITE_GTM_ID to
+build". If something breaks, compare with `git diff v1.0-no-analytics`.
 
 Goal
 ----
@@ -191,6 +197,9 @@ Added to the existing markup (no layout/behaviour change):
   data-gtm="delivery-method"     each delivery radio
   data-gtm="place-order"         "Підтвердити замовлення"
   data-gtm="back-home"           confirmation "Повернутися на головну"
+  data-gtm="theme-toggle"        header light/dark toggle (+ data-theme-
+                                 target="dark|light"); no dataLayer event,
+                                 a GTM click-trigger exercise only
   Product-related buttons also carry data-item-id="cream_001" etc.
 
 
@@ -220,4 +229,5 @@ Definition of done
 - Every event in 4.5 appears exactly once per interaction, each ecommerce
   push is preceded by { ecommerce: null }, values are numbers, currency UAH.
 - No PII in any push (manual check with a test order).
-- Branch merged to main, live site redeployed.
+- All work pushed to main, live site redeployed, tag v1.1-datalayer
+  pushed.

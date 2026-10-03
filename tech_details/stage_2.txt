@@ -8,6 +8,43 @@ cart, checkout, confirmation. Every button works. NO analytics of any kind:
 no dataLayer, no GTM, no tracking helpers, no data-gtm attributes. Those
 are added in Stage 4, after the site is deployed (Stage 3).
 
+Decisions (agreed before starting)
+----------------------------------
+- Mobile header: compact, no burger — logo = home, cart icon = cart,
+  "Каталог" stays as text, theme toggle always visible.
+- Theme toggle: light/dark only. Follows the OS until the first click,
+  then the explicit choice is saved. No "Як у системі" option.
+- Hero: include the floating serum card (like the reference).
+- Quantity: selector 1–10 on the product page; NO limit in the cart.
+- Phone: spaces, dashes and brackets allowed ("+380 (67) 123-45-67"),
+  stripped before validation.
+- Commits: pause at 4 checkpoints and propose commits (see Progress).
+
+Progress
+--------
+Legend: [x] done   [ ] open
+Checkpoint 1 — data, router, cart, theme
+  [x] 2.1 types/shop.ts, data/products.ts, data/delivery.ts
+  [x] 2.2 router/router.ts, router/useRoute.ts, router/Link.tsx
+  [x] 2.3 context/CartContext.ts + context/CartProvider.tsx, hooks/useCart.ts
+  [x] 2.4 context/ThemeContext.ts + context/ThemeProvider.tsx,
+          hooks/useTheme.ts, components/ThemeToggle.tsx
+  [x] Temporary test page in App.tsx (removed at checkpoint 2)
+  [x] lint + build clean
+Checkpoint 2 — layout and home page
+  [ ] 2.5 Header, Footer, App layout + route outlet
+  [ ] 2.6 HomePage: Hero (+ floating serum card), ProductGrid,
+          ProductCard ("Додано в кошик"), Benefits
+Checkpoint 3 — remaining pages
+  [ ] ProductPage + ProductDetails + QuantitySelector
+  [ ] CartPage + Cart (empty state)
+  [ ] CheckoutPage + CheckoutForm + OrderSummary
+  [ ] ConfirmationPage + OrderConfirmation, NotFoundPage
+Checkpoint 4 — polish and testing
+  [ ] 2.7 responsive + dark theme polish
+  [ ] Definition of done checks (below)
+  [ ] Git: all work pushed to main, tag v0.2-website (user's command)
+
 Design reference: tech_details/telegram-cloud-photo-...jpg
 (warm beige background, serif headings, small pill labels, dark-brown pill
 buttons with an arrow, product cards on a cream tile, generous whitespace).
@@ -56,9 +93,13 @@ Document title is updated on every route change (e.g. "Кошик — Glow Care"
 
 2.3 Cart state
 --------------
-src/context/CartContext.tsx
+src/context/CartContext.ts   (context object + CartContextValue type)
+src/context/CartProvider.tsx (provider; split from the context so the
+                              react-refresh lint rule stays clean and to
+                              avoid CartContext.ts/.tsx name clashes on
+                              case-insensitive macOS)
   useReducer actions: ADD(productId, qty), INCREMENT, DECREMENT (min 1;
-  removal via a separate trash button), REMOVE, CLEAR.
+  removal via a separate trash button), REMOVE, CLEAR. No max quantity.
   Lazy init from localStorage key "glowcare_cart" (try/catch, validate that
   ids still exist in products.ts); save on every change.
   Derived values: lines (product + quantity + lineTotal), itemCount,
@@ -70,15 +111,13 @@ src/hooks/useCart.ts — throws a helpful error if used outside the provider.
 
 2.4 Theme (light / dark)
 ------------------------
-src/context/ThemeContext.tsx
-  preference: "system" | "light" | "dark"   (initial value read from
-                                              localStorage "glowcare_theme",
-                                              absent -> "system")
-  resolvedTheme: "light" | "dark"           (system -> matchMedia result)
-  setPreference(p): saves to localStorage ("system" removes the key) and
-  sets document.documentElement.dataset.theme = resolvedTheme.
-  While preference = "system", listen to matchMedia("(prefers-color-
-  scheme: dark)") change events so the site follows the OS live.
+src/context/ThemeContext.ts + src/context/ThemeProvider.tsx
+  theme: "light" | "dark" — initial value read from <html data-theme>
+  (already set by the pre-paint script, so React never flips it).
+  toggleTheme(): saves "glowcare_theme" in localStorage and sets
+  document.documentElement.dataset.theme; also syncs <meta theme-color>.
+  Until a choice is saved, listen to matchMedia("(prefers-color-scheme:
+  dark)") change events so the site follows the OS live.
   Must agree with the pre-paint script in index.html (Stage 1) — same key,
   same logic — so React never flips the theme after load.
 src/hooks/useTheme.ts — throws a helpful error outside the provider.
@@ -86,8 +125,7 @@ ThemeToggle
   icon button in the header: Moon in light theme, Sun in dark theme;
   click toggles light <-> dark (an explicit choice). aria-label
   "Увімкнути темну тему" / "Увімкнути світлу тему", aria-pressed.
-  (Optional: long-press / small menu with "Як у системі" to go back to
-  system mode; otherwise document that clearing site data resets it.)
+  (No "system" option — clearing site data returns to following the OS.)
 
 
 2.5 Layout components
@@ -160,8 +198,8 @@ NotFoundPage — simple 404 with link home.
 - Colors ONLY via tokens (var(--color-...)) — no hex values in CSS
   Modules, so every component works in both themes automatically.
 - Dark theme specifics:
-    * Product PNGs have light studio backgrounds: keep them on the
-      --color-cream tile with rounded corners (they read as "cards"), and
+    * Product images are full WebP photos (peach/beige scene, no
+      transparency): show them as rounded rectangular tiles, and
       optionally filter: brightness(0.92) in dark to reduce glare.
     * Hero photo: subtle dark gradient overlay in dark theme so the H1
       stays readable; never invert or recolor photos.

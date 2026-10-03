@@ -63,7 +63,7 @@ Polish and testing
   [~] Click-through flows (not automatable here): add/+/−/remove,
       checkout validation messages and focus, valid order -> confirmation
       -> cart empty, refresh on /confirmation, back/forward, keyboard-only
-  [ ] Git: all work pushed to main, tag v0.2-website (user's command)
+  [x] Git: all work pushed to main, tag v0.2-website pushed
 
 Notes
 -----

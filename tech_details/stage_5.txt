@@ -1,0 +1,108 @@
+STAGE 5 — TESTING, DEPLOYMENT AND FINAL DELIVERY
+=================================================
+
+Goal
+----
+Verify everything works, publish the site on free HTTPS hosting, and hand
+over the complete, documented project.
+
+
+5.1 Functional testing (spec §13) — run in Chrome + one mobile viewport
+-----------------------------------------------------------------------
+[ ]  1 Homepage loads, no console errors.
+[ ]  2 Catalog shows all 4 products with correct names/prices in UAH.
+[ ]  3 "Детальніше" opens /product/:id with correct data; direct URL works.
+[ ]  4 Products can be added (card and details page, with quantity).
+[ ]  5 Quantity +/− works in cart; header badge updates live.
+[ ]  6 Remove works; empty state appears when last item removed.
+[ ]  7 Totals correct (e.g. 2×450 + 1×620 = 1 520 ₴).
+[ ]  8 Cart persists after F5 / closing tab.
+[ ]  9 Checkout shows field errors for empty / invalid email / invalid phone
+       / no delivery / unchecked terms.
+[ ] 10 Invalid form cannot be submitted.
+[ ] 11 Valid demo order completes.
+[ ] 12 Confirmation shows transaction ID, items, correct total.
+[ ] 13 Cart empty after purchase.
+[ ] 14 Refresh on /confirmation: page still shows order, NO new purchase
+       push in dataLayer.
+Extra: /checkout with empty cart redirects to /cart; unknown route -> 404;
+back/forward buttons work; keyboard-only navigation works.
+
+
+5.2 Analytics testing
+---------------------
+[ ]  1 `window.dataLayer` exists on every page (also without GTM).
+[ ]  2 Each interaction in the mapping table pushes exactly one event.
+[ ]  3 Ecommerce pushes: preceded by {ecommerce:null}; currency "UAH";
+       value/price/quantity are numbers; value = Σ price×qty.
+[ ]  4 Test order with fake data — search the dataLayer (JSON.stringify)
+       for the name/email/phone: must NOT be found.
+[ ]  5 Set a GTM ID -> gtm.js loads; remove it -> nothing loads, site OK.
+[ ]  6 GA4 via GTM Preview + DebugView           (only if learner has IDs)
+[ ]  7 Meta via Pixel Helper + Test Events        (only if learner has IDs)
+[ ]  8 No duplicates: page_view once per route change, purchase once.
+[ ]  9 Site works with GTM not configured.
+[ ] 10 Site works with GTM configured but no Meta tags.
+Report honestly: items 6–7 are marked "not verified" unless real IDs and
+tools were actually used.
+
+Automated checks: `npm run lint` and `npm run build` (tsc type check) must
+pass with zero errors. (Optional: add Vitest unit tests for the cart reducer,
+itemsValue() and the purchase de-dup helper.)
+
+
+5.3 Local run instructions (README)
+-----------------------------------
+- Install Node.js LTS (nodejs.org) and check `node -v`, `npm -v`.
+- npm install
+- cp .env.example .env   and set VITE_GTM_ID (optional)
+- npm run dev            -> http://localhost:5173
+- npm run build          -> dist/
+- npm run preview        -> test the production build locally
+
+
+5.4 Deployment — recommended: Netlify (free, HTTPS, SPA-friendly)
+-----------------------------------------------------------------
+Why public HTTPS matters: Meta Pixel Helper / Events Manager, GA4 and Tag
+Assistant work best on a real public URL; teammates can test; same setup as
+real sites.
+
+Steps:
+1. Push project to a GitHub repository (git init, commit, gh repo create
+   or GitHub web UI).
+2. Netlify -> Add new site -> Import from GitHub -> choose repo.
+3. Build command: npm run build   Publish directory: dist
+4. Site settings -> Environment variables: VITE_GTM_ID = GTM-…  -> redeploy.
+5. public/_redirects (/*  /index.html  200) makes /product/cream_001 etc.
+   work on refresh.
+6. Optionally rename the site (glow-care-demo.netlify.app).
+7. Add the URL to GTM Preview and to the GA4 data stream / Meta Pixel
+   settings where relevant.
+Alternative (short note): Netlify Drop — drag the dist/ folder (GTM ID must
+be in .env before building). Mention Vercel / GitHub Pages as alternatives
+(GitHub Pages needs a base path + 404.html trick -> not recommended for
+beginners).
+
+
+5.5 Final delivery checklist (spec §16)
+---------------------------------------
+[ ] Complete source code, cleaned of template leftovers
+[ ] Config files: package.json, vite.config.ts (GTM plugin), tsconfig*,
+    .env.example, .gitignore, public/_redirects, .oxlintrc.json
+[ ] README.md (English, all 17 topics, mapping tables)
+[ ] Installation instructions
+[ ] Deployment instructions
+[ ] GTM implementation guide        (docs/gtm-setup.md)
+[ ] GA4 event tracking guide        (docs/ga4-guide.md)
+[ ] Meta Pixel implementation guide (docs/meta-pixel-guide.md)
+[ ] Testing checklist               (docs/testing-checklist.md = 5.1 + 5.2)
+[ ] Troubleshooting                 (docs/troubleshooting.md)
+[ ] Live demo URL (if deployed)
+
+
+Definition of done
+------------------
+- All functional checks pass; analytics checks 1–5, 8–10 pass; 6–7 either
+  verified with real IDs or explicitly marked as learner steps.
+- Site live on HTTPS (or exact deploy steps ready if account not available).
+- Learner can follow README from `git clone` to seeing events in GTM Preview.

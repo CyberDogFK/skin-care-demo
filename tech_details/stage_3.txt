@@ -1,0 +1,144 @@
+STAGE 3 — dataLayer IMPLEMENTATION AND GTM INSTALLATION HOOK
+=============================================================
+
+Goal
+----
+Push every required interaction into window.dataLayer with correct, typed
+GA4 ecommerce payloads; install GTM via the official snippet when (and only
+when) a GTM ID is configured. No direct GA4 / Meta calls anywhere.
+
+
+3.1 GTM installation (configurable, safe when missing)
+------------------------------------------------------
+.env.example
+  # Paste your container ID from tagmanager.google.com, e.g. GTM-AB12CDE
+  VITE_GTM_ID=GTM-XXXXXXX
+
+vite.config.ts — inline plugin `gtmPlugin()` using transformIndexHtml:
+  - reads VITE_GTM_ID via loadEnv(mode, process.cwd())
+  - if valid (/^GTM-[A-Z0-9]+$/ and !== "GTM-XXXXXXX"):
+      inject official GTM <script> as high in <head> as possible
+      inject official <noscript><iframe ...></noscript> right after <body>
+  - else: inject nothing, print a one-line console warning during build.
+The learner edits ONLY .env (locally) or the hosting env-var settings
+(Netlify). Rebuild/restart dev server after changing it.
+
+src/analytics/dataLayer.ts also does `window.dataLayer = window.dataLayer || []`
+so pushes never fail if GTM is absent or blocked by an ad blocker.
+
+
+3.2 Types — src/analytics/analyticsTypes.ts
+-------------------------------------------
+  declare global { interface Window { dataLayer: DataLayerObject[] } }
+
+  Ga4Item         { item_id, item_name, item_category, price, quantity,
+                    index?, item_list_id?, item_list_name? }
+  EcommercePayload{ currency: "UAH", value: number, items: Ga4Item[],
+                    transaction_id?, shipping_tier?,
+                    item_list_id?, item_list_name? }
+  EcommerceEventName = "view_item_list" | "select_item" | "view_item" |
+                       "add_to_cart" | "remove_from_cart" | "view_cart" |
+                       "begin_checkout" | "add_shipping_info" | "purchase"
+  CustomEventName    = "page_view" | "click_cta" | "form_start" |
+                       "form_submit"
+  PageViewPayload    { page_path, page_location, page_title }
+
+
+3.3 Utility — src/analytics/dataLayer.ts
+----------------------------------------
+  initDataLayer()                       safe init (idempotent)
+  pushEvent(name, params?)              custom event
+  pushEcommerceEvent(name, ecommerce)   pushes { ecommerce: null } FIRST,
+                                        then { event, ecommerce }
+  Dev helper: when import.meta.env.DEV, console.log each push with a
+  "[dataLayer]" prefix so beginners can see events without GTM.
+  Optional guard: assertNoPii(payload) in DEV — warns if any value looks
+  like an email or phone number.
+
+src/analytics/ecommerce.ts
+  toGa4Item(product, quantity, index?)  -> Ga4Item
+  itemsValue(items)                     -> sum(price * quantity), rounded
+                                           to 2 decimals, number type
+
+src/analytics/analyticsConfig.ts
+  export const CUSTOM_EVENTS = { click_cta: true, form_start: true,
+                                 form_submit: true }
+  (spec §8: optional events, easy to enable/disable in one place)
+
+src/analytics/track.ts — one small function per event; components call
+these, never window.dataLayer directly.
+
+
+3.4 Event wiring (where each push happens)
+------------------------------------------
+Event              Fired from                         Payload notes
+-----------------  ---------------------------------  ---------------------------
+page_view          router: initial load + every       page_path, page_location,
+                   navigate()/popstate (only place)   page_title (title updated
+                                                      BEFORE push)
+view_item_list     ProductGrid, IntersectionObserver  item_list_id "catalog",
+                   when #catalog is ≥50% visible,     item_list_name
+                   once per page view (ref guard)     "Каталог", all 4 items
+                                                      with index
+select_item        "Детальніше" click / card image    1 item + list id/name
+                   click (before navigating)
+view_item          ProductPage on product change      1 item, quantity 1,
+                   (guarded by ref keyed on id)       value = price
+add_to_cart        CartContext.addToCart() and        item with ADDED qty,
+                   increment (+)                      value = price * added qty
+remove_from_cart   CartContext.removeFromCart() and   item with REMOVED qty,
+                   decrement (−)                      value accordingly
+view_cart          CartPage on open (guarded)         all lines, cart total
+                   (empty cart -> skip)
+begin_checkout     CheckoutPage on open with          all lines, cart total
+                   non-empty cart (guarded)
+add_shipping_info  delivery radio change (once per    all lines, total,
+                   distinct method per checkout)      shipping_tier = method id
+purchase           ConfirmationPage — see 3.5         transaction_id, value,
+                                                      currency, items
+click_cta          Hero CTA click                     cta_text, cta_location
+form_start         first focus/input in checkout      form_name
+                   form (once per checkout visit)     "checkout"
+form_submit        after validation passes, before    form_name "checkout"
+                   navigating to confirmation         (NO field values)
+
+
+3.5 Purchase de-duplication
+---------------------------
+1. On valid submit the Order is saved as "glowcare_last_order".
+2. ConfirmationPage effect:
+     const tracked = read("glowcare_tracked_transactions")  // string[]
+     if (!tracked.includes(order.transactionId)) {
+       write(tracked + id)        // mark FIRST (StrictMode / fast refresh)
+       trackPurchase(order)
+     }
+3. Refreshing /confirmation, going back/forward, or StrictMode double
+   effects -> already tracked -> no second push.
+4. Opening /checkout or submitting an invalid form never reaches this code.
+Keep the tracked list trimmed (e.g. last 20 ids).
+
+
+3.6 Privacy rules (enforced in code review)
+-------------------------------------------
+- track.ts functions accept products/orders only — there is no parameter
+  through which name, email or phone could be passed.
+- Order stored in localStorage contains no personal fields.
+- delivery method is sent as an id ("nova_poshta"), not an address.
+
+
+3.7 Inspecting the dataLayer (to document in README)
+----------------------------------------------------
+- DevTools Console: type `dataLayer` and press Enter; expand entries.
+- `dataLayer.filter(e => e.event)` to see only events.
+- In dev mode watch the "[dataLayer]" console logs.
+- With GTM installed: GTM Preview / Tag Assistant shows each push on the
+  left timeline.
+
+
+Definition of done
+------------------
+- With NO GTM ID: site works, dataLayer fills, no errors, no GTM requests.
+- With a GTM ID: gtm.js loads (Network tab), noscript iframe present.
+- Every event in 3.4 appears exactly once per interaction, each ecommerce
+  push is preceded by { ecommerce: null }, values are numbers, currency UAH.
+- No PII in any push (manual check with a test order).

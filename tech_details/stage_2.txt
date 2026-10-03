@@ -1,0 +1,159 @@
+STAGE 2 — WEBSITE DEVELOPMENT (NO ANALYTICS YET)
+=================================================
+
+Goal
+----
+A fully working Ukrainian-language skincare store: browse, view details,
+cart, checkout, confirmation. Every button works. No analytics code yet —
+only the data-gtm attributes are added now so markup is final.
+
+Design reference: tech_details/telegram-cloud-photo-...jpg
+(warm beige background, serif headings, small pill labels, dark-brown pill
+buttons with an arrow, product cards on a cream tile, generous whitespace).
+
+
+2.1 Data and types
+------------------
+src/types/shop.ts
+  Product      { id, name, category, price, description, shortDescription,
+                 image, volume? }
+  CartItem     { productId, quantity }   (product data looked up by id, so
+                                          prices are never stale in storage)
+  DeliveryMethod = "nova_poshta" | "ukrposhta" | "courier" | "pickup"
+  Order        { transactionId, items: {product, quantity}[], total,
+                 deliveryMethod, createdAt }
+
+src/data/products.ts  (Ukrainian texts, UAH)
+  cream_001      Зволожувальний крем          450  категорія "Креми"
+  serum_002      Сироватка для обличчя        620  категорія "Сироватки"
+  cleanser_003   Очищувальний гель            380  категорія "Очищення"
+  sunscreen_004  Сонцезахисний крем SPF 50    550  категорія "Захист від сонця"
+  + getProductById(id), formatPrice(n) -> "450 ₴" via
+    Intl.NumberFormat("uk-UA", { style: "currency", currency: "UAH" }).
+  + DELIVERY_METHODS list with Ukrainian labels and demo prices
+    (keep delivery free in the demo so purchase value = cart total;
+     state this in the UI: "Доставка безкоштовна (демо)").
+
+
+2.2 Router
+----------
+src/router/router.ts
+  - navigate(path): history.pushState + notify subscribers + scrollTo(0,0)
+  - listen to popstate (back/forward)
+  - matchRoute(path) -> { name, params } for the 5 routes + not-found
+src/router/useRoute.ts — useSyncExternalStore over the router.
+<Link to="..."> component that renders <a href> and calls navigate()
+on click (keeps real links: middle-click / open in new tab still work).
+Hash anchors: "/#catalog" scrolls to the catalog section.
+
+
+2.3 Cart state
+--------------
+src/context/CartContext.tsx
+  useReducer actions: ADD(productId, qty), INCREMENT, DECREMENT (removes at 0
+  — or min 1 with a separate remove button; choose min 1 + trash icon),
+  REMOVE, CLEAR.
+  Lazy init from localStorage key "glowcare_cart" (try/catch, validate that
+  ids still exist in products.ts); save on every change.
+  Derived values: lines (product + quantity + lineTotal), itemCount,
+  subtotal, total.
+  NOTE for Stage 3: action functions (addToCart, removeFromCart, ...) will be
+  the single place where cart dataLayer events are pushed, so keep them as
+  named functions exposed from the context, not raw dispatch.
+src/hooks/useCart.ts — throws a helpful error if used outside the provider.
+
+
+2.4 Layout components
+---------------------
+Header      logo "Glow Care" (Link to /), nav: Головна, Каталог (/#catalog),
+            Кошик; cart icon (lucide ShoppingBag) with live count badge;
+            mobile: burger menu or compact nav.
+Footer      brand line, demo disclaimer ("Навчальний демо-магазин. Реальні
+            замовлення та оплати не здійснюються."), year.
+
+
+2.5 Pages
+---------
+HomePage
+  - Hero: pill label "Догляд для шкіри", serif H1 (e.g. "Ніжний догляд для
+    сяйва вашої шкіри"), short brand description, CTA button
+    "Обрати догляд" (data-gtm="cta") -> smooth scroll to #catalog.
+    Hero image = optimized woman photo; optional floating product card
+    (like the reference) showing the serum with "Додати в кошик".
+  - ProductGrid "Наші продукти" (id="catalog"): 4 ProductCards.
+  - Benefits: 3–4 items with lucide icons (Натуральні інгредієнти,
+    Дерматологічно протестовано, Швидка доставка, Без тестування на
+    тваринах).
+ProductCard
+  image on cream tile, category pill, name, short description, price,
+  buttons "Детальніше" (data-gtm="product-details", data-item-id) and
+  "Додати в кошик" (data-gtm="add-to-cart", data-item-id).
+  Show a short inline toast/label "Додано в кошик" after adding.
+ProductPage (/product/:id)
+  breadcrumb/back link, large image, name, category, price, full
+  description, QuantitySelector (1–10), "Додати в кошик"
+  (data-gtm="add-to-cart"). Unknown id -> NotFound state.
+CartPage (/cart)
+  lines: image, name, unit price, quantity −/+ (data-gtm="cart-increase" /
+  "cart-decrease"), line total, remove (data-gtm="remove-from-cart").
+  Summary: subtotal, delivery "безкоштовно", total; button
+  "Оформити замовлення" (data-gtm="checkout") -> /checkout.
+  Empty state: icon, "Ваш кошик порожній", button back to catalog.
+CheckoutPage (/checkout)
+  Redirect to /cart if cart is empty.
+  CheckoutForm fields: Ім'я (required, ≥2 letters), Email (required,
+  regex), Телефон (required, Ukrainian format +380XXXXXXXXX / 0XXXXXXXXX),
+  Спосіб доставки (radio group, required), checkbox "Я погоджуюсь з
+  умовами демо-магазину" (required).
+  Validation on submit + on blur; field-level Ukrainian error messages;
+  aria-invalid / aria-describedby; focus first invalid field.
+  Hint under the form: "Використовуйте лише вигадані тестові дані."
+  OrderSummary sidebar: items, quantities, total, selected delivery method.
+  Button "Підтвердити замовлення" (data-gtm="place-order").
+  On valid submit:
+    1. generate transactionId, e.g. "GC-20261003-4F7K2Q"
+       (date + crypto.getRandomValues base36).
+    2. build Order (items, total, deliveryMethod) — NO personal fields.
+    3. save to localStorage "glowcare_last_order".
+    4. clear cart.
+    5. navigate("/confirmation").
+  Form data is never sent anywhere and never stored.
+ConfirmationPage (/confirmation)
+  Reads "glowcare_last_order". Shows success icon, "Дякуємо за
+  замовлення!", transaction ID, purchased items, total, delivery method,
+  button "Повернутися на головну" (data-gtm="back-home").
+  If no stored order -> friendly message + link to catalog.
+NotFoundPage — simple 404 with link home.
+
+
+2.6 Styling
+-----------
+- global.css tokens + CSS Modules per component (Header.module.css, ...).
+- Responsive: grid 4 cols desktop / 2 tablet / 1 mobile; checkout two
+  columns -> stacked on mobile; header collapses on mobile.
+- Accessible: visible focus styles, buttons are <button>, links are <a>,
+  all icon-only buttons have aria-label in Ukrainian, alt text on images,
+  color contrast AA.
+
+
+2.7 data-gtm attribute map (final markup)
+-----------------------------------------
+  data-gtm="cta"                 Hero "Обрати догляд"
+  data-gtm="product-details"     "Детальніше" on a card
+  data-gtm="add-to-cart"         any "Додати в кошик"
+  data-gtm="cart-icon"           header cart link
+  data-gtm="cart-increase"       + in cart
+  data-gtm="cart-decrease"       − in cart
+  data-gtm="remove-from-cart"    trash in cart
+  data-gtm="checkout"            "Оформити замовлення"
+  data-gtm="delivery-method"     each delivery radio
+  data-gtm="place-order"         "Підтвердити замовлення"
+  data-gtm="back-home"           confirmation "Повернутися на головну"
+  Product-related buttons also carry data-item-id="cream_001" etc.
+
+
+Definition of done
+------------------
+- All 14 functional checks from spec §13 pass manually (see Stage 5 list).
+- No console errors; `npm run build` and `npm run lint` clean.
+- Looks good at 375px, 768px, 1280px widths.

@@ -1,0 +1,190 @@
+STAGE 1 — PLANNING AND PROJECT FOUNDATION
+==========================================
+
+Goal
+----
+Agree on the architecture, project structure and package list, and prepare
+the existing Vite + React + TypeScript scaffold so the next stages can build
+on it. No store features are built in this stage.
+
+Starting point (already in the repo)
+------------------------------------
+- Vite 8 + React 19 + TypeScript 6 scaffold (npm, oxlint).
+- Default template files: src/App.tsx, src/App.css, src/index.css, src/assets/*.
+- Assets in tech_details/:
+    cream.png, serum.png, cleanser.png, sunscreen.png  (1024x1024 product shots)
+    woman.PNG                                          (1672x941 hero image)
+    telegram-cloud-photo-...jpg                        (visual design reference:
+                                                        warm beige, serif headings,
+                                                        dark-brown pill buttons,
+                                                        product card on hero)
+
+
+1. Architecture overview
+------------------------
+
+  User action (click, form submit, route change)
+        |
+        v
+  React component / hook  --->  src/analytics/track*.ts helpers
+                                        |
+                                        v
+                            window.dataLayer.push({ event, ecommerce })
+                                        |
+                                        v
+                         Google Tag Manager (loaded only if GTM ID is set)
+                                |                       |
+                                v                       v
+                         GA4 event tags          Meta Pixel tags
+                     (Measurement ID in GTM)  (Pixel ID in GTM)
+
+Key decisions:
+
+a) No analytics code talks to GA4 or Meta directly. The site ONLY pushes to
+   window.dataLayer. All IDs (GA4 Measurement ID, Meta Pixel ID) live in GTM.
+
+b) One interaction = one dataLayer push. GA4 and Meta tags in GTM both listen
+   to the same event (e.g. "add_to_cart" -> GA4 add_to_cart + Meta AddToCart).
+
+c) Routing: a tiny custom router (~40 lines, History API: pushState +
+   popstate) instead of react-router. Keeps dependencies minimal and gives us
+   ONE place where every route change happens — which is exactly where the
+   SPA page_view is pushed.
+   Routes:
+     /                 Home (hero, catalog, benefits)
+     /product/:id      Product details
+     /cart             Shopping cart
+     /checkout         Checkout form
+     /confirmation     Order confirmation
+
+d) page_view strategy (chosen once, used everywhere):
+   - The site pushes {event: "page_view", page_path, page_title, page_location}
+     on initial load AND on every route change, from the router only.
+   - In GTM the Google tag is configured with send_page_view = false, and GA4
+     Enhanced Measurement "page changes based on browser history events" is
+     turned OFF. A GA4 event tag "page_view" + Meta "PageView" fire on the
+     custom event "page_view". Result: exactly one page_view per view.
+
+e) State: React Context + useReducer for the cart (CartProvider + useCart
+   hook), persisted to localStorage. No Redux.
+
+f) GTM ID configuration: environment variable VITE_GTM_ID in a .env file
+   (template in .env.example). A small inline Vite plugin in vite.config.ts
+   injects the OFFICIAL GTM snippets (<head> script + <body> noscript iframe)
+   into index.html at build/dev time ONLY when VITE_GTM_ID matches
+   /^GTM-[A-Z0-9]+$/ and is not the placeholder GTM-XXXXXXX. Without a valid
+   ID nothing is injected and the site works normally. No React component
+   ever contains the ID.
+
+g) React StrictMode stays ON. Because StrictMode runs effects twice in dev,
+   analytics events are pushed from event handlers or the router where
+   possible; any effect-based event (view_item_list, purchase) is protected
+   by a ref / localStorage guard so it fires once.
+
+h) Privacy: dataLayer payloads never contain name, email, phone or delivery
+   address. Only product data, totals, transaction_id and the delivery
+   METHOD (a non-personal option like "nova_poshta").
+
+
+2. Proposed project structure
+-----------------------------
+
+  .env.example                 VITE_GTM_ID=GTM-XXXXXXX (placeholder)
+  index.html                   lang="uk", title, fonts; GTM injected by plugin
+  vite.config.ts               react plugin + gtmInjectPlugin
+  public/
+    favicon.svg
+    _redirects                 Netlify SPA fallback: /*  /index.html  200
+  src/
+    main.tsx
+    App.tsx                    providers + router outlet + layout
+    router/
+      router.ts                navigate(), current path, route matching
+      useRoute.ts              hook returning current route + params
+    data/
+      products.ts              4 products (typed), formatPrice()
+    types/
+      shop.ts                  Product, CartItem, Order, DeliveryMethod
+    context/
+      CartContext.tsx          CartProvider (useReducer + localStorage)
+    hooks/
+      useCart.ts               typed access to the cart context
+    analytics/
+      analyticsTypes.ts        GA4 item / event payload types
+      analyticsConfig.ts       on/off flags for optional custom events
+      dataLayer.ts             initDataLayer, pushEvent, pushEcommerceEvent
+      ecommerce.ts             toGa4Item(), buildItems(), calcValue()
+      track.ts                 trackAddToCart(), trackPurchase(), ... helpers
+    components/
+      Header.tsx               logo, nav, cart icon + count
+      Footer.tsx
+      Hero.tsx
+      ProductCard.tsx
+      ProductGrid.tsx          catalog section (#catalog)
+      Benefits.tsx
+      ProductDetails.tsx
+      QuantitySelector.tsx
+      Cart.tsx                 cart lines + totals + empty state
+      CheckoutForm.tsx
+      OrderSummary.tsx
+      OrderConfirmation.tsx
+    pages/
+      HomePage.tsx
+      ProductPage.tsx
+      CartPage.tsx
+      CheckoutPage.tsx
+      ConfirmationPage.tsx
+      NotFoundPage.tsx
+    assets/
+      products/ cream.jpg serum.jpg cleanser.jpg sunscreen.jpg
+      hero.jpg
+    styles/
+      global.css               design tokens (CSS variables), base, layout
+      (+ *.module.css per component where styles grow)
+  README.md                    full beginner guide (Stage 4)
+  docs/                        optional: long GTM guides split out of README
+
+
+3. Package list
+---------------
+
+Runtime dependencies:
+  react, react-dom            (already installed, v19)
+  lucide-react                icons (cart, plus, minus, trash, arrow, check)
+
+Dev dependencies (already installed — no new ones required):
+  vite, @vitejs/plugin-react, typescript, @types/react, @types/react-dom,
+  @types/node, oxlint
+
+Intentionally NOT added: react-router, redux/zustand, UI kits, form
+libraries, gtag.js / react-ga4 / react-facebook-pixel, a test runner.
+(Testing is a manual checklist + a dev-mode dataLayer console logger. Vitest
+can be added later if automated tests are wanted.)
+
+
+4. Tasks in this stage
+----------------------
+[ ] npm install lucide-react
+[ ] Remove template leftovers: src/App.css, src/assets/react.svg,
+    src/assets/vite.svg, src/assets/hero.png, public/icons.svg, demo App.tsx.
+[ ] Replace src/index.css with src/styles/global.css (light theme only —
+    remove the dark "prefers-color-scheme" block; brand is beige/cream).
+[ ] Create the folder structure above with empty/stub files.
+[ ] Copy & optimize images from tech_details/ into src/assets/
+    (convert PNG -> JPG/WebP, ~800px for products, ~1600px for hero, so each
+    is ~100–250 KB instead of 1–3 MB), e.g. with macOS `sips`.
+[ ] index.html: lang="uk", <title>Glow Care — догляд за шкірою</title>,
+    meta description, Google Fonts (serif for headings, e.g. "Cormorant
+    Garamond" or "Lora"; sans for body, e.g. "Inter" — both support Cyrillic).
+[ ] Add .env.example with VITE_GTM_ID=GTM-XXXXXXX; add .env to .gitignore.
+[ ] Define design tokens in global.css:
+      --color-bg #F7F2EC, --color-surface #FFFFFF, --color-cream #EFE6DC,
+      --color-text #2B2420, --color-muted #7A6E66, --color-accent #3A2E28,
+      --radius, --shadow, spacing scale, breakpoints 640 / 960 px.
+[ ] `npm run dev`, `npm run build`, `npm run lint` all pass.
+
+Definition of done
+------------------
+- Plan approved.
+- Clean scaffold builds and lints with zero errors.
+- Folder structure and tokens in place; images optimized and imported.

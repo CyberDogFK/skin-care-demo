@@ -1,36 +1,164 @@
-STAGE 5 — TESTING, DEPLOYMENT AND FINAL DELIVERY
-=================================================
+STAGE 5 — GTM / GA4 / META PIXEL DOCS, ANALYTICS TESTING, FINAL DELIVERY
+=========================================================================
+
+Prerequisite
+------------
+Stage 4 merged and live on GitHub Pages.
 
 Goal
 ----
-Verify everything works, publish the site on free HTTPS hosting, and hand
-over the complete, documented project.
+Beginner-friendly, step-by-step English documentation so a learner with no
+prior experience can configure GTM, GA4 and Meta Pixel for this site;
+verify analytics behaviour; hand over the complete, documented project.
+No real IDs anywhere — only GTM-XXXXXXX, G-XXXXXXXXXX, META_PIXEL_ID.
+
+Format: README.md (overview + quick start + event table) and, to keep the
+README readable, detailed guides in docs/:
+  docs/gtm-setup.md
+  docs/ga4-guide.md
+  docs/meta-pixel-guide.md
+  docs/testing-checklist.md
+  docs/troubleshooting.md
+README links to each and covers all 17 points from spec §15.
 
 
-5.1 Functional testing (spec §13) — run in Chrome + one mobile viewport
------------------------------------------------------------------------
-[ ]  1 Homepage loads, no console errors.
-[ ]  2 Catalog shows all 4 products with correct names/prices in UAH.
-[ ]  3 "Детальніше" opens /product/:id with correct data; direct URL works.
-[ ]  4 Products can be added (card and details page, with quantity).
-[ ]  5 Quantity +/− works in cart; header badge updates live.
-[ ]  6 Remove works; empty state appears when last item removed.
-[ ]  7 Totals correct (e.g. 2×450 + 1×620 = 1 520 ₴).
-[ ]  8 Cart persists after F5 / closing tab.
-[ ]  9 Checkout shows field errors for empty / invalid email / invalid phone
-       / no delivery / unchecked terms.
-[ ] 10 Invalid form cannot be submitted.
-[ ] 11 Valid demo order completes.
-[ ] 12 Confirmation shows transaction ID, items, correct total.
-[ ] 13 Cart empty after purchase.
-[ ] 14 Refresh on /confirmation: page still shows order, NO new purchase
-       push in dataLayer.
-Extra: /checkout with empty cart redirects to /cart; unknown route -> 404;
-back/forward buttons work; keyboard-only navigation works.
+5.1 Concepts section (simple English)
+-------------------------------------
+- What GTM, a container, tags, triggers and variables are.
+- dataLayer event vs analytics event: the website announces "something
+  happened" (dataLayer event); GTM decides which tools hear about it and
+  under which name (GA4 event, Meta event). One dataLayer event can feed
+  several analytics events.
+- Browser page load vs SPA route change; GA4 automatic page_view vs
+  GTM-managed page_view; the approach this project uses and why
+  (see Stage 4 §4.1 c), and how duplicates appear if both are on.
+- Note on the GitHub Pages base path: page_path includes "/<repo>/".
+- Consent note: real sites may need a consent banner / Consent Mode
+  depending on law (GDPR etc.), location and ad setup; this demo does not
+  implement one and is NOT legally compliant for production.
 
 
-5.2 Analytics testing
+5.2 Master mapping table (in README)
+------------------------------------
+Interaction | dataLayer event | GA4 event | Meta event | Params | Trigger
+------------|-----------------|-----------|------------|--------|--------
+Any page/route view | page_view | page_view | PageView | page_path, page_title | Custom Event = page_view
+Catalog visible | view_item_list | view_item_list | — | items, item_list_* | Custom Event = view_item_list
+Click "Детальніше" | select_item | select_item | — | items, item_list_* | Custom Event = select_item
+Product page opened | view_item | view_item | ViewContent | currency, value, items | Custom Event = view_item
+Add to cart / + | add_to_cart | add_to_cart | AddToCart | currency, value, items | Custom Event = add_to_cart
+Remove / − | remove_from_cart | remove_from_cart | — | currency, value, items | Custom Event = remove_from_cart
+Cart opened | view_cart | view_cart | — | currency, value, items | Custom Event = view_cart
+Checkout opened | begin_checkout | begin_checkout | InitiateCheckout | currency, value, items | Custom Event = begin_checkout
+Delivery chosen | add_shipping_info | add_shipping_info | — | shipping_tier, currency, value, items | Custom Event = add_shipping_info
+Valid form submitted | form_submit | form_submit | Lead | form_name | Custom Event = form_submit
+Order confirmed | purchase | purchase | Purchase | transaction_id, currency, value, items | Custom Event = purchase
+Hero CTA click | click_cta | click_cta | — | cta_text | Custom Event = click_cta
+First form interaction | form_start | form_start | — | form_name | Custom Event = form_start
+Plus a second table: data-gtm attribute -> element -> related event
+(from Stage 4 §4.7), with an example "Click – All Elements" trigger using
+Click Element matches CSS selector [data-gtm="cta"] as an alternative
+learning exercise (and a warning not to fire BOTH variants -> duplicates).
+
+
+5.3 docs/gtm-setup.md
 ---------------------
+1. Create a GTM account + Web container; find the GTM-XXXXXXX ID.
+2. Put the ID into .env (local) and into the GitHub repository variable
+   VITE_GTM_ID (live); restart dev server / re-run the deploy workflow.
+3. Verify installation (view source / Network gtm.js / Tag Assistant).
+4. Create Data Layer Variables:
+     DLV - ecommerce.value, DLV - ecommerce.currency, DLV - ecommerce.items,
+     DLV - ecommerce.transaction_id, DLV - page_path, DLV - page_title …
+   (Data Layer Version 2.)
+5. Create Custom Event triggers, one per event (CE - add_to_cart …), or one
+   regex trigger for all GA4 ecommerce events
+   ^(view_item_list|select_item|view_item|add_to_cart|...|purchase)$.
+6. Folder/naming convention: "GA4 - Event - add_to_cart",
+   "Meta - AddToCart", "CE - add_to_cart".
+7. Preview mode (use the GitHub Pages URL), Submit + Publish, versions.
+
+
+5.4 docs/ga4-guide.md
+---------------------
+1. Create GA4 property + Web data stream (GitHub Pages URL); find
+   G-XXXXXXXXXX.
+2. Enhanced Measurement: turn OFF "Page changes based on browser history
+   events" (keep scrolls/outbound etc. optional).
+3. GTM: Google tag with the Measurement ID, config parameter
+   send_page_view = false, trigger Initialization - All Pages.
+4. GA4 Event tag "page_view" on CE - page_view with page_location /
+   page_title parameters.
+5. GA4 Event tags for ecommerce: event name {{Event}} (or explicit), tick
+   "Send Ecommerce data" -> Data Layer, trigger = the ecommerce regex
+   trigger. Explain why one tag is fine and why separate tags are OK too.
+6. Custom events click_cta / form_start / form_submit (note: GA4 Enhanced
+   Measurement "form interactions" may also send form_start/form_submit ->
+   disable it to avoid duplicates).
+7. Testing: GTM Preview -> GA4 DebugView; Realtime; Monetization ->
+   Ecommerce purchases (data delay 24–48h); internal-traffic note.
+
+
+5.5 docs/meta-pixel-guide.md
+----------------------------
+1. Create/access a Pixel (Dataset) in Meta Events Manager; find
+   META_PIXEL_ID. No ad campaign needed.
+2. GTM Custom HTML tag "Meta - Base Code" with official fbq snippet using
+   META_PIXEL_ID, fires fbq('init') once. Fire on Initialization - All
+   Pages; DO NOT call fbq('track','PageView') inside it (SPA would only
+   track the first page) — PageView is a separate tag on CE - page_view.
+   Mention Community Template alternative briefly, but the guide uses
+   Custom HTML for transparency.
+3. Tag sequencing: event tags "fire after" base code (setup tag).
+4. Custom JavaScript variables that convert GA4 items to Meta params:
+     cjs - meta content_ids  -> items.map(i => i.item_id)
+     cjs - meta contents     -> items.map(i => ({id, quantity, item_price}))
+     content_type "product", content_name (single item), value, currency.
+5. Event tags (Custom HTML, fbq('track', ...)):
+     PageView          on CE - page_view
+     ViewContent       on CE - view_item
+     AddToCart         on CE - add_to_cart
+     InitiateCheckout  on CE - begin_checkout
+     Lead              on CE - form_submit
+     Purchase          on CE - purchase  (value, currency, contents,
+                                          content_ids, content_type;
+                                          optional eventID = transaction_id
+                                          for dedup awareness)
+6. Testing: Meta Pixel Helper (Chrome extension), Events Manager -> Test
+   Events, what green/yellow/red warnings mean.
+7. Don't also install the Pixel via another plugin/script -> duplicates.
+
+
+5.6 Duplicate events section
+----------------------------
+Symptoms and causes:
+- 2× page_view: GA4 automatic page_view + GTM page_view tag, or Enhanced
+  Measurement history events on.
+- 2× PageView: PageView inside base code + separate PageView tag.
+- 2× add_to_cart: Custom Event trigger AND click trigger both firing.
+- 2× form_start/form_submit: Enhanced Measurement form interactions.
+- 2× purchase: tag fired on Page View of /confirmation instead of
+  CE - purchase; or local de-dup removed.
+- Tags firing twice because GTM snippet installed twice.
+How to detect: GTM Preview tag-fired counts, DebugView, Pixel Helper
+counts, dataLayer inspection in console.
+
+
+5.7 docs/troubleshooting.md
+---------------------------
+GTM not loading (ID missing/typo, repo variable not set, workflow not
+re-run, env not reloaded locally, ad blocker), Preview won't connect
+(popup blocked, wrong URL incl. base path, cookies), variables "undefined"
+(DLV path / version), ecommerce data stale (missing ecommerce:null),
+DebugView empty (debug_mode, preview not connected, wrong property),
+Pixel Helper shows nothing (base tag not firing, ad blocker), values as
+strings, purchase not visible in reports yet (processing delay),
+404 on refresh (Pages fallback missing).
+
+
+5.8 Analytics testing (docs/testing-checklist.md = Stage 3 §3.1 + this)
+-----------------------------------------------------------------------
+[ ]  0 Stage 3 functional checklist re-run on the live site — all pass.
 [ ]  1 `window.dataLayer` exists on every page (also without GTM).
 [ ]  2 Each interaction in the mapping table pushes exactly one event.
 [ ]  3 Ecommerce pushes: preceded by {ecommerce:null}; currency "UAH";
@@ -40,69 +168,41 @@ back/forward buttons work; keyboard-only navigation works.
 [ ]  5 Set a GTM ID -> gtm.js loads; remove it -> nothing loads, site OK.
 [ ]  6 GA4 via GTM Preview + DebugView           (only if learner has IDs)
 [ ]  7 Meta via Pixel Helper + Test Events        (only if learner has IDs)
-[ ]  8 No duplicates: page_view once per route change, purchase once.
+[ ]  8 No duplicates: page_view once per route change, purchase once;
+       refresh on /confirmation -> NO new purchase push.
 [ ]  9 Site works with GTM not configured.
 [ ] 10 Site works with GTM configured but no Meta tags.
 Report honestly: items 6–7 are marked "not verified" unless real IDs and
 tools were actually used.
 
-Automated checks: `npm run lint` and `npm run build` (tsc type check) must
-pass with zero errors. (Optional: add Vitest unit tests for the cart reducer,
-itemsValue() and the purchase de-dup helper.)
+Automated checks: `npm run lint` and `npm run build` pass with zero errors.
+(Optional: Vitest unit tests for the cart reducer, itemsValue() and the
+purchase de-dup helper.)
 
 
-5.3 Local run instructions (README)
------------------------------------
-- Install Node.js LTS (nodejs.org) and check `node -v`, `npm -v`.
-- npm install
-- cp .env.example .env   and set VITE_GTM_ID (optional)
-- npm run dev            -> http://localhost:5173
-- npm run build          -> dist/
-- npm run preview        -> test the production build locally
-
-
-5.4 Deployment — recommended: Netlify (free, HTTPS, SPA-friendly)
------------------------------------------------------------------
-Why public HTTPS matters: Meta Pixel Helper / Events Manager, GA4 and Tag
-Assistant work best on a real public URL; teammates can test; same setup as
-real sites.
-
-Steps:
-1. Push project to a GitHub repository (git init, commit, gh repo create
-   or GitHub web UI).
-2. Netlify -> Add new site -> Import from GitHub -> choose repo.
-3. Build command: npm run build   Publish directory: dist
-4. Site settings -> Environment variables: VITE_GTM_ID = GTM-…  -> redeploy.
-5. public/_redirects (/*  /index.html  200) makes /product/cream_001 etc.
-   work on refresh.
-6. Optionally rename the site (glow-care-demo.netlify.app).
-7. Add the URL to GTM Preview and to the GA4 data stream / Meta Pixel
-   settings where relevant.
-Alternative (short note): Netlify Drop — drag the dist/ folder (GTM ID must
-be in .env before building). Mention Vercel / GitHub Pages as alternatives
-(GitHub Pages needs a base path + 404.html trick -> not recommended for
-beginners).
-
-
-5.5 Final delivery checklist (spec §16)
+5.9 Final delivery checklist (spec §16)
 ---------------------------------------
 [ ] Complete source code, cleaned of template leftovers
-[ ] Config files: package.json, vite.config.ts (GTM plugin), tsconfig*,
-    .env.example, .gitignore, public/_redirects, .oxlintrc.json
+[ ] Config files: package.json, vite.config.ts (base path + GTM plugin),
+    tsconfig*, .env.example, .gitignore, eslint.config.js, .prettierrc,
+    public/404.html, .github/workflows/deploy.yml
 [ ] README.md (English, all 17 topics, mapping tables)
 [ ] Installation instructions
-[ ] Deployment instructions
+[ ] Deployment instructions (GitHub Pages + repo variable for GTM ID)
 [ ] GTM implementation guide        (docs/gtm-setup.md)
 [ ] GA4 event tracking guide        (docs/ga4-guide.md)
 [ ] Meta Pixel implementation guide (docs/meta-pixel-guide.md)
-[ ] Testing checklist               (docs/testing-checklist.md = 5.1 + 5.2)
+[ ] Testing checklist               (docs/testing-checklist.md)
 [ ] Troubleshooting                 (docs/troubleshooting.md)
-[ ] Live demo URL (if deployed)
+[ ] Live demo URL (GitHub Pages)
+[ ] Git tags: v1.0-no-analytics, v2.0-analytics
 
 
 Definition of done
 ------------------
+- README covers all 17 points of spec §15 + both mapping tables.
+- A reader can go from `git clone` to seeing events in GTM Preview
+  following only the docs. No real IDs; only placeholders.
 - All functional checks pass; analytics checks 1–5, 8–10 pass; 6–7 either
   verified with real IDs or explicitly marked as learner steps.
-- Site live on HTTPS (or exact deploy steps ready if account not available).
-- Learner can follow README from `git clone` to seeing events in GTM Preview.
+- Final version live on GitHub Pages and tagged v2.0-analytics.

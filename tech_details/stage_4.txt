@@ -1,154 +1,223 @@
-STAGE 4 — GTM, GA4 AND META PIXEL DOCUMENTATION
-================================================
+STAGE 4 — ANALYTICS: dataLayer, data-gtm ATTRIBUTES, GTM INSTALLATION
+======================================================================
+
+Prerequisite
+------------
+Stage 3 milestone reached: the store is live on GitHub Pages, all
+functional checks pass, tag v1.0-no-analytics exists.
+Work on a branch (e.g. `feature/analytics`) and merge into main when this
+stage's definition of done is met, so the live site keeps working.
 
 Goal
 ----
-Beginner-friendly, step-by-step English documentation so a learner with no
-prior experience can configure GTM, GA4 and Meta Pixel for this site.
-No real IDs anywhere — only GTM-XXXXXXX, G-XXXXXXXXXX, META_PIXEL_ID.
-
-Format: README.md (overview + quick start + event table) and, to keep the
-README readable, detailed guides in docs/:
-  docs/gtm-setup.md
-  docs/ga4-guide.md
-  docs/meta-pixel-guide.md
-  docs/testing-checklist.md
-  docs/troubleshooting.md
-README links to each and covers all 17 points from spec §15.
+Push every required interaction into window.dataLayer with correct, typed
+GA4 ecommerce payloads; add data-gtm attributes; install GTM via the
+official snippet when (and only when) a GTM ID is configured. No direct
+GA4 / Meta calls anywhere. The store's behaviour must not change.
 
 
-4.1 Concepts section (simple English)
--------------------------------------
-- What GTM, a container, tags, triggers and variables are.
-- dataLayer event vs analytics event: the website announces "something
-  happened" (dataLayer event); GTM decides which tools hear about it and
-  under which name (GA4 event, Meta event). One dataLayer event can feed
-  several analytics events.
-- Browser page load vs SPA route change; GA4 automatic page_view vs
-  GTM-managed page_view; the approach this project uses and why
-  (see Stage 1 §d), and how duplicates appear if both are on.
-- Consent note: real sites may need a consent banner / Consent Mode
-  depending on law (GDPR etc.), location and ad setup; this demo does not
-  implement one and is NOT legally compliant for production.
+4.1 Architecture additions
+--------------------------
+
+  User action (click, form submit, route change)
+        |
+        v
+  CartContext actions / router / pages  --->  src/analytics/track.ts
+                                                      |
+                                                      v
+                                   window.dataLayer.push({ event, ecommerce })
+                                                      |
+                                                      v
+                         Google Tag Manager (loaded only if GTM ID is set)
+                                |                       |
+                                v                       v
+                         GA4 event tags          Meta Pixel tags
+                     (Measurement ID in GTM)  (Pixel ID in GTM)
+
+a) No analytics code talks to GA4 or Meta directly. The site ONLY pushes to
+   window.dataLayer. All IDs (GA4 Measurement ID, Meta Pixel ID) live in GTM.
+b) One interaction = one dataLayer push. GA4 and Meta tags in GTM both listen
+   to the same event (e.g. "add_to_cart" -> GA4 add_to_cart + Meta AddToCart).
+c) page_view strategy (chosen once, used everywhere):
+   - The site pushes {event: "page_view", page_path, page_title,
+     page_location} on initial load AND on every route change, from the
+     router only.
+   - In GTM the Google tag is configured with send_page_view = false, and
+     GA4 Enhanced Measurement "page changes based on browser history events"
+     is turned OFF. A GA4 event tag "page_view" + Meta "PageView" fire on the
+     custom event "page_view". Result: exactly one page_view per view.
+   - page_path is the real browser path (location.pathname), INCLUDING the
+     GitHub Pages base path, so it matches what GA4 / Tag Assistant see;
+     document this in Stage 5.
+d) StrictMode runs effects twice in dev: events are pushed from event
+   handlers or the router where possible; any effect-based event
+   (view_item, view_cart, begin_checkout, purchase) is protected by a ref /
+   localStorage guard so it fires once.
+e) Privacy: dataLayer payloads never contain name, email, phone or delivery
+   address. Only product data, totals, transaction_id and the delivery
+   METHOD id.
 
 
-4.2 Master mapping table (in README)
-------------------------------------
-Interaction | dataLayer event | GA4 event | Meta event | Params | Trigger
-------------|-----------------|-----------|------------|--------|--------
-Any page/route view | page_view | page_view | PageView | page_path, page_title | Custom Event = page_view
-Catalog visible | view_item_list | view_item_list | — | items, item_list_* | Custom Event = view_item_list
-Click "Детальніше" | select_item | select_item | — | items, item_list_* | Custom Event = select_item
-Product page opened | view_item | view_item | ViewContent | currency, value, items | Custom Event = view_item
-Add to cart / + | add_to_cart | add_to_cart | AddToCart | currency, value, items | Custom Event = add_to_cart
-Remove / − | remove_from_cart | remove_from_cart | — | currency, value, items | Custom Event = remove_from_cart
-Cart opened | view_cart | view_cart | — | currency, value, items | Custom Event = view_cart
-Checkout opened | begin_checkout | begin_checkout | InitiateCheckout | currency, value, items | Custom Event = begin_checkout
-Delivery chosen | add_shipping_info | add_shipping_info | — | shipping_tier, currency, value, items | Custom Event = add_shipping_info
-Valid form submitted | form_submit | form_submit | Lead | form_name | Custom Event = form_submit
-Order confirmed | purchase | purchase | Purchase | transaction_id, currency, value, items | Custom Event = purchase
-Hero CTA click | click_cta | click_cta | — | cta_text | Custom Event = click_cta
-First form interaction | form_start | form_start | — | form_name | Custom Event = form_start
-Plus a second table: data-gtm attribute -> element -> related event
-(from Stage 2 §2.7), with an example "Click – All Elements" trigger using
-Click Element matches CSS selector [data-gtm="cta"] as an alternative
-learning exercise (and a warning not to fire BOTH variants -> duplicates).
+4.2 GTM installation (configurable, safe when missing)
+------------------------------------------------------
+.env.example (committed)
+  # Paste your container ID from tagmanager.google.com, e.g. GTM-AB12CDE
+  VITE_GTM_ID=GTM-XXXXXXX
+.env (local, git-ignored) — learner's real ID.
+
+vite.config.ts — inline plugin `gtmPlugin()` using transformIndexHtml:
+  - reads VITE_GTM_ID via loadEnv(mode, process.cwd())
+  - if valid (/^GTM-[A-Z0-9]+$/ and !== "GTM-XXXXXXX"):
+      inject official GTM <script> as high in <head> as possible
+      inject official <noscript><iframe ...></noscript> right after <body>
+  - else: inject nothing, print a one-line console warning during build.
+
+GitHub Pages: the ID is NOT committed. Store it as a repository variable
+(Settings -> Secrets and variables -> Actions -> Variables -> VITE_GTM_ID;
+a GTM ID is public anyway, so a variable is fine) and add ONE line to the
+build step of .github/workflows/deploy.yml:
+    env: VITE_GTM_ID: ${{ vars.VITE_GTM_ID }}
+Missing variable -> build still succeeds, site works without GTM.
+After changing the ID: restart dev server (local) / re-run the workflow
+(live).
+
+src/analytics/dataLayer.ts also does `window.dataLayer = window.dataLayer || []`
+so pushes never fail if GTM is absent or blocked by an ad blocker.
 
 
-4.3 docs/gtm-setup.md
----------------------
-1. Create a GTM account + Web container; find the GTM-XXXXXXX ID.
-2. Put the ID into .env (local) / Netlify env vars (live); restart/rebuild.
-3. Verify installation (view source / Network gtm.js / Tag Assistant).
-4. Create Data Layer Variables:
-     DLV - ecommerce.value, DLV - ecommerce.currency, DLV - ecommerce.items,
-     DLV - ecommerce.transaction_id, DLV - page_path, DLV - page_title …
-   (Data Layer Version 2.)
-5. Create Custom Event triggers, one per event (CE - add_to_cart …), or one
-   regex trigger for all GA4 ecommerce events
-   ^(view_item_list|select_item|view_item|add_to_cart|...|purchase)$.
-6. Folder/naming convention: "GA4 - Event - add_to_cart",
-   "Meta - AddToCart", "CE - add_to_cart".
-7. Preview mode, Submit + Publish, versions.
+4.3 Types — src/analytics/analyticsTypes.ts
+-------------------------------------------
+  declare global { interface Window { dataLayer: DataLayerObject[] } }
+
+  Ga4Item         { item_id, item_name, item_category, price, quantity,
+                    index?, item_list_id?, item_list_name? }
+  EcommercePayload{ currency: "UAH", value: number, items: Ga4Item[],
+                    transaction_id?, shipping_tier?,
+                    item_list_id?, item_list_name? }
+  EcommerceEventName = "view_item_list" | "select_item" | "view_item" |
+                       "add_to_cart" | "remove_from_cart" | "view_cart" |
+                       "begin_checkout" | "add_shipping_info" | "purchase"
+  CustomEventName    = "page_view" | "click_cta" | "form_start" |
+                       "form_submit"
+  PageViewPayload    { page_path, page_location, page_title }
 
 
-4.4 docs/ga4-guide.md
----------------------
-1. Create GA4 property + Web data stream; find G-XXXXXXXXXX.
-2. Enhanced Measurement: turn OFF "Page changes based on browser history
-   events" (keep scrolls/outbound etc. optional).
-3. GTM: Google tag with the Measurement ID, config parameter
-   send_page_view = false, trigger Initialization - All Pages.
-4. GA4 Event tag "page_view" on CE - page_view with page_location /
-   page_title parameters.
-5. GA4 Event tags for ecommerce: event name {{Event}} (or explicit), tick
-   "Send Ecommerce data" -> Data Layer, trigger = the ecommerce regex
-   trigger. Explain why one tag is fine and why separate tags are OK too.
-6. Custom events click_cta / form_start / form_submit (note: GA4 Enhanced
-   Measurement "form interactions" may also send form_start/form_submit ->
-   disable it to avoid duplicates).
-7. Testing: GTM Preview -> GA4 DebugView; Realtime; Monetization ->
-   Ecommerce purchases (data delay 24–48h); internal-traffic note.
+4.4 Utility — src/analytics/dataLayer.ts
+----------------------------------------
+  initDataLayer()                       safe init (idempotent)
+  pushEvent(name, params?)              custom event
+  pushEcommerceEvent(name, ecommerce)   pushes { ecommerce: null } FIRST,
+                                        then { event, ecommerce }
+  Dev helper: when import.meta.env.DEV, console.log each push with a
+  "[dataLayer]" prefix so beginners can see events without GTM.
+  Optional guard: assertNoPii(payload) in DEV — warns if any value looks
+  like an email or phone number.
+
+src/analytics/ecommerce.ts
+  toGa4Item(product, quantity, index?)  -> Ga4Item
+  itemsValue(items)                     -> sum(price * quantity), rounded
+                                           to 2 decimals, number type
+
+src/analytics/analyticsConfig.ts
+  export const CUSTOM_EVENTS = { click_cta: true, form_start: true,
+                                 form_submit: true }
+  (spec §8: optional events, easy to enable/disable in one place)
+
+src/analytics/track.ts — one small function per event; components call
+these, never window.dataLayer directly.
 
 
-4.5 docs/meta-pixel-guide.md
-----------------------------
-1. Create/access a Pixel (Dataset) in Meta Events Manager; find
-   META_PIXEL_ID. No ad campaign needed.
-2. GTM Custom HTML tag "Meta - Base Code" with official fbq snippet using
-   META_PIXEL_ID, fires fbq('init') once. Fire on Initialization - All
-   Pages; DO NOT call fbq('track','PageView') inside it (SPA would only
-   track the first page) — PageView is a separate tag on CE - page_view.
-   Mention Community Template alternative ("Facebook Pixel" by facebookarchive
-   / similar) briefly, but the guide uses Custom HTML for transparency.
-3. Tag sequencing: event tags "fire after" base code (setup tag).
-4. Custom JavaScript variables that convert GA4 items to Meta params:
-     cjs - meta content_ids  -> items.map(i => i.item_id)
-     cjs - meta contents     -> items.map(i => ({id, quantity, item_price}))
-     content_type "product", content_name (single item), value, currency.
-5. Event tags (Custom HTML, fbq('track', ...)):
-     PageView          on CE - page_view
-     ViewContent       on CE - view_item
-     AddToCart         on CE - add_to_cart
-     InitiateCheckout  on CE - begin_checkout
-     Lead              on CE - form_submit
-     Purchase          on CE - purchase  (value, currency, contents,
-                                          content_ids, content_type;
-                                          optional eventID = transaction_id
-                                          for dedup awareness)
-6. Testing: Meta Pixel Helper (Chrome extension), Events Manager -> Test
-   Events, what green/yellow/red warnings mean.
-7. Don't also install the Pixel via another plugin/script -> duplicates.
+4.5 Event wiring (where each push happens)
+------------------------------------------
+Event              Fired from                         Payload notes
+-----------------  ---------------------------------  ---------------------------
+page_view          router: initial load + every       page_path, page_location,
+                   navigate()/popstate (only place)   page_title (title updated
+                                                      BEFORE push)
+view_item_list     ProductGrid, IntersectionObserver  item_list_id "catalog",
+                   when #catalog is ≥50% visible,     item_list_name
+                   once per page view (ref guard)     "Каталог", all 4 items
+                                                      with index
+select_item        "Детальніше" click / card image    1 item + list id/name
+                   click (before navigating)
+view_item          ProductPage on product change      1 item, quantity 1,
+                   (guarded by ref keyed on id)       value = price
+add_to_cart        CartContext.addToCart() and        item with ADDED qty,
+                   increment (+)                      value = price * added qty
+remove_from_cart   CartContext.removeFromCart() and   item with REMOVED qty,
+                   decrement (−)                      value accordingly
+view_cart          CartPage on open (guarded)         all lines, cart total
+                   (empty cart -> skip)
+begin_checkout     CheckoutPage on open with          all lines, cart total
+                   non-empty cart (guarded)
+add_shipping_info  delivery radio change (once per    all lines, total,
+                   distinct method per checkout)      shipping_tier = method id
+purchase           ConfirmationPage — see 4.6         transaction_id, value,
+                                                      currency, items
+click_cta          Hero CTA click                     cta_text, cta_location
+form_start         first focus/input in checkout      form_name
+                   form (once per checkout visit)     "checkout"
+form_submit        after validation passes, before    form_name "checkout"
+                   navigating to confirmation         (NO field values)
 
 
-4.6 Duplicate events section
-----------------------------
-Symptoms and causes:
-- 2× page_view: GA4 automatic page_view + GTM page_view tag, or Enhanced
-  Measurement history events on.
-- 2× PageView: PageView inside base code + separate PageView tag.
-- 2× add_to_cart: Custom Event trigger AND click trigger both firing.
-- 2× form_start/form_submit: Enhanced Measurement form interactions.
-- 2× purchase: tag fired on Page View of /confirmation instead of
-  CE - purchase; or local de-dup removed.
-- Tags firing twice because GTM snippet installed twice.
-How to detect: GTM Preview tag-fired counts, DebugView, Pixel Helper
-counts, dataLayer inspection in console.
-
-
-4.7 docs/troubleshooting.md
+4.6 Purchase de-duplication
 ---------------------------
-GTM not loading (ID missing/typo, env not rebuilt, ad blocker), Preview
-won't connect (popup blocked, wrong URL, cookies), variables "undefined"
-(DLV path / version), ecommerce data stale (missing ecommerce:null),
-DebugView empty (debug_mode, preview not connected, wrong property),
-Pixel Helper shows nothing (base tag not firing, ad blocker), values as
-strings, purchase not visible in reports yet (processing delay).
+1. On valid submit the Order is saved as "glowcare_last_order" (already
+   done in Stage 2).
+2. ConfirmationPage effect:
+     const tracked = read("glowcare_tracked_transactions")  // string[]
+     if (!tracked.includes(order.transactionId)) {
+       write(tracked + id)        // mark FIRST (StrictMode / fast refresh)
+       trackPurchase(order)
+     }
+3. Refreshing /confirmation, going back/forward, or StrictMode double
+   effects -> already tracked -> no second push.
+4. Opening /checkout or submitting an invalid form never reaches this code.
+Keep the tracked list trimmed (e.g. last 20 ids).
+
+
+4.7 data-gtm attribute map
+--------------------------
+Added to the existing markup (no layout/behaviour change):
+  data-gtm="cta"                 Hero "Обрати догляд"
+  data-gtm="product-details"     "Детальніше" on a card
+  data-gtm="add-to-cart"         any "Додати в кошик"
+  data-gtm="cart-icon"           header cart link
+  data-gtm="cart-increase"       + in cart
+  data-gtm="cart-decrease"       − in cart
+  data-gtm="remove-from-cart"    trash in cart
+  data-gtm="checkout"            "Оформити замовлення"
+  data-gtm="delivery-method"     each delivery radio
+  data-gtm="place-order"         "Підтвердити замовлення"
+  data-gtm="back-home"           confirmation "Повернутися на головну"
+  Product-related buttons also carry data-item-id="cream_001" etc.
+
+
+4.8 Privacy rules (enforced in code review)
+-------------------------------------------
+- track.ts functions accept products/orders only — there is no parameter
+  through which name, email or phone could be passed.
+- Order stored in localStorage contains no personal fields.
+- delivery method is sent as an id ("nova_poshta"), not an address.
+
+
+4.9 Inspecting the dataLayer (to document in Stage 5)
+-----------------------------------------------------
+- DevTools Console: type `dataLayer` and press Enter; expand entries.
+- `dataLayer.filter(e => e.event)` to see only events.
+- In dev mode watch the "[dataLayer]" console logs.
+- With GTM installed: GTM Preview / Tag Assistant shows each push on the
+  left timeline.
 
 
 Definition of done
 ------------------
-- README covers all 17 points of spec §15 + both mapping tables.
-- A reader can go from zero to GA4 + Meta events visible in debug tools
-  following only the docs.
-- No real IDs; only placeholders.
+- All Stage 3 functional checks still pass (no regressions).
+- With NO GTM ID: site works, dataLayer fills, no errors, no GTM requests.
+- With a GTM ID: gtm.js loads (Network tab), noscript iframe present —
+  locally and on GitHub Pages via the repository variable.
+- Every event in 4.5 appears exactly once per interaction, each ecommerce
+  push is preceded by { ecommerce: null }, values are numbers, currency UAH.
+- No PII in any push (manual check with a test order).
+- Branch merged to main, live site redeployed.

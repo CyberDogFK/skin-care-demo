@@ -1,11 +1,12 @@
-STAGE 2 — WEBSITE DEVELOPMENT (NO ANALYTICS YET)
-=================================================
+STAGE 2 — WEBSITE DEVELOPMENT (NO ANALYTICS)
+=============================================
 
 Goal
 ----
 A fully working Ukrainian-language skincare store: browse, view details,
-cart, checkout, confirmation. Every button works. No analytics code yet —
-only the data-gtm attributes are added now so markup is final.
+cart, checkout, confirmation. Every button works. NO analytics of any kind:
+no dataLayer, no GTM, no tracking helpers, no data-gtm attributes. Those
+are added in Stage 4, after the site is deployed (Stage 3).
 
 Design reference: tech_details/telegram-cloud-photo-...jpg
 (warm beige background, serif headings, small pill labels, dark-brown pill
@@ -30,36 +31,40 @@ src/data/products.ts  (Ukrainian texts, UAH)
   sunscreen_004  Сонцезахисний крем SPF 50    550  категорія "Захист від сонця"
   + getProductById(id), formatPrice(n) -> "450 ₴" via
     Intl.NumberFormat("uk-UA", { style: "currency", currency: "UAH" }).
-  + DELIVERY_METHODS list with Ukrainian labels and demo prices
-    (keep delivery free in the demo so purchase value = cart total;
+  + DELIVERY_METHODS list with Ukrainian labels
+    (delivery is free in the demo so order total = cart total;
      state this in the UI: "Доставка безкоштовна (демо)").
 
 
 2.2 Router
 ----------
 src/router/router.ts
+  - BASE = import.meta.env.BASE_URL ("/" locally, "/<repo-name>/" on
+    GitHub Pages). All route matching works on the path WITHOUT the base;
+    navigate() and <Link> add the base back. Never hardcode "/" in hrefs.
   - navigate(path): history.pushState + notify subscribers + scrollTo(0,0)
   - listen to popstate (back/forward)
   - matchRoute(path) -> { name, params } for the 5 routes + not-found
+  - On startup, restore a redirected path if one was stored by the
+    GitHub Pages 404.html fallback (see Stage 3 §3.3) and replaceState it.
 src/router/useRoute.ts — useSyncExternalStore over the router.
-<Link to="..."> component that renders <a href> and calls navigate()
-on click (keeps real links: middle-click / open in new tab still work).
+src/router/Link.tsx — renders <a href> and calls navigate() on plain
+left-click (keeps real links: middle-click / open in new tab still work).
 Hash anchors: "/#catalog" scrolls to the catalog section.
+Document title is updated on every route change (e.g. "Кошик — Glow Care").
 
 
 2.3 Cart state
 --------------
 src/context/CartContext.tsx
-  useReducer actions: ADD(productId, qty), INCREMENT, DECREMENT (removes at 0
-  — or min 1 with a separate remove button; choose min 1 + trash icon),
-  REMOVE, CLEAR.
+  useReducer actions: ADD(productId, qty), INCREMENT, DECREMENT (min 1;
+  removal via a separate trash button), REMOVE, CLEAR.
   Lazy init from localStorage key "glowcare_cart" (try/catch, validate that
   ids still exist in products.ts); save on every change.
   Derived values: lines (product + quantity + lineTotal), itemCount,
   subtotal, total.
-  NOTE for Stage 3: action functions (addToCart, removeFromCart, ...) will be
-  the single place where cart dataLayer events are pushed, so keep them as
-  named functions exposed from the context, not raw dispatch.
+  Expose named action functions (addToCart, increment, decrement,
+  removeFromCart, clearCart) from the context, not raw dispatch.
 src/hooks/useCart.ts — throws a helpful error if used outside the provider.
 
 
@@ -77,7 +82,7 @@ Footer      brand line, demo disclaimer ("Навчальний демо-мага
 HomePage
   - Hero: pill label "Догляд для шкіри", serif H1 (e.g. "Ніжний догляд для
     сяйва вашої шкіри"), short brand description, CTA button
-    "Обрати догляд" (data-gtm="cta") -> smooth scroll to #catalog.
+    "Обрати догляд" -> smooth scroll to #catalog.
     Hero image = optimized woman photo; optional floating product card
     (like the reference) showing the serum with "Додати в кошик".
   - ProductGrid "Наші продукти" (id="catalog"): 4 ProductCards.
@@ -86,18 +91,16 @@ HomePage
     тваринах).
 ProductCard
   image on cream tile, category pill, name, short description, price,
-  buttons "Детальніше" (data-gtm="product-details", data-item-id) and
-  "Додати в кошик" (data-gtm="add-to-cart", data-item-id).
+  buttons "Детальніше" and "Додати в кошик".
   Show a short inline toast/label "Додано в кошик" after adding.
 ProductPage (/product/:id)
   breadcrumb/back link, large image, name, category, price, full
-  description, QuantitySelector (1–10), "Додати в кошик"
-  (data-gtm="add-to-cart"). Unknown id -> NotFound state.
+  description, QuantitySelector (1–10), "Додати в кошик".
+  Unknown id -> NotFound state.
 CartPage (/cart)
-  lines: image, name, unit price, quantity −/+ (data-gtm="cart-increase" /
-  "cart-decrease"), line total, remove (data-gtm="remove-from-cart").
+  lines: image, name, unit price, quantity −/+, line total, remove (trash).
   Summary: subtotal, delivery "безкоштовно", total; button
-  "Оформити замовлення" (data-gtm="checkout") -> /checkout.
+  "Оформити замовлення" -> /checkout.
   Empty state: icon, "Ваш кошик порожній", button back to catalog.
 CheckoutPage (/checkout)
   Redirect to /cart if cart is empty.
@@ -109,7 +112,7 @@ CheckoutPage (/checkout)
   aria-invalid / aria-describedby; focus first invalid field.
   Hint under the form: "Використовуйте лише вигадані тестові дані."
   OrderSummary sidebar: items, quantities, total, selected delivery method.
-  Button "Підтвердити замовлення" (data-gtm="place-order").
+  Button "Підтвердити замовлення".
   On valid submit:
     1. generate transactionId, e.g. "GC-20261003-4F7K2Q"
        (date + crypto.getRandomValues base36).
@@ -121,7 +124,9 @@ CheckoutPage (/checkout)
 ConfirmationPage (/confirmation)
   Reads "glowcare_last_order". Shows success icon, "Дякуємо за
   замовлення!", transaction ID, purchased items, total, delivery method,
-  button "Повернутися на головну" (data-gtm="back-home").
+  button "Повернутися на головну".
+  Refreshing the page shows the same order again (it is read from storage,
+  not created on page load).
   If no stored order -> friendly message + link to catalog.
 NotFoundPage — simple 404 with link home.
 
@@ -134,26 +139,19 @@ NotFoundPage — simple 404 with link home.
 - Accessible: visible focus styles, buttons are <button>, links are <a>,
   all icon-only buttons have aria-label in Ukrainian, alt text on images,
   color contrast AA.
-
-
-2.7 data-gtm attribute map (final markup)
------------------------------------------
-  data-gtm="cta"                 Hero "Обрати догляд"
-  data-gtm="product-details"     "Детальніше" on a card
-  data-gtm="add-to-cart"         any "Додати в кошик"
-  data-gtm="cart-icon"           header cart link
-  data-gtm="cart-increase"       + in cart
-  data-gtm="cart-decrease"       − in cart
-  data-gtm="remove-from-cart"    trash in cart
-  data-gtm="checkout"            "Оформити замовлення"
-  data-gtm="delivery-method"     each delivery radio
-  data-gtm="place-order"         "Підтвердити замовлення"
-  data-gtm="back-home"           confirmation "Повернутися на головну"
-  Product-related buttons also carry data-item-id="cream_001" etc.
+- Use stable, semantic markup and meaningful class names / ids (e.g.
+  id="catalog") — this makes adding data-gtm attributes in Stage 4 a
+  small, mechanical change.
 
 
 Definition of done
 ------------------
-- All 14 functional checks from spec §13 pass manually (see Stage 5 list).
+- All 14 functional checks from spec §13 pass manually (see Stage 3 list;
+  check 14 is verified here as "refresh shows the same order", the
+  purchase-event part is verified in Stage 5).
+- Works with `npm run dev` AND with a non-root base path
+  (`npm run build -- --base=/skin-care-demo/` + `npm run preview`):
+  links, images and refresh on a deep URL behave correctly.
 - No console errors; `npm run build` and `npm run lint` clean.
 - Looks good at 375px, 768px, 1280px widths.
+- grep for "dataLayer", "gtm", "gtag", "fbq" in src/ returns nothing.

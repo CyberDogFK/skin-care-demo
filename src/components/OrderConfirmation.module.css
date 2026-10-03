@@ -1,0 +1,68 @@
+.confirmation {
+  display: grid;
+  gap: var(--space-6);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-cream);
+  color: var(--color-success);
+}
+
+.title {
+  font-size: clamp(2rem, 3vw + 1rem, 3rem);
+}
+
+.text {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.facts {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  transition: var(--transition-theme);
+}
+
+.facts dt {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.transactionId {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+}
+
+.home {
+  justify-self: center;
+}
+
+@media (min-width: 640px) {
+  .facts {
+    grid-template-columns: 1fr 1fr;
+  }
+}

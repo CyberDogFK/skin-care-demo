@@ -1,0 +1,38 @@
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.layout {
+  display: grid;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* Phone: show what is being ordered above the form */
+.summary {
+  order: -1;
+}
+
+@media (min-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr 380px;
+    gap: var(--space-8);
+  }
+
+  .summary {
+    position: sticky;
+    top: 88px;
+    order: 0;
+  }
+}

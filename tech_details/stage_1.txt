@@ -1,16 +1,36 @@
-STAGE 1 — PLANNING AND PROJECT FOUNDATION
-==========================================
+STAGE 1 — PLANNING AND PROJECT FOUNDATION (NO ANALYTICS)
+==========================================================
 
 Goal
 ----
 Agree on the architecture, project structure and package list, and prepare
 the existing Vite + React + TypeScript scaffold so the next stages can build
-on it. No store features are built in this stage.
+on it. No store features and NO analytics code are built in this stage.
+
+Overall order of work (changed from the original spec §16)
+----------------------------------------------------------
+  Part A — a plain, fully working store, deployed to GitHub. Zero analytics.
+    Stage 1  Planning and foundation
+    Stage 2  Website development
+    Stage 3  Functional testing + deployment to GitHub (GitHub Pages)
+             -> MILESTONE: live HTTPS site, all features work, no tracking.
+  Part B — analytics added on top of the working, deployed site.
+    Stage 4  dataLayer, data-gtm attributes, GTM installation hook
+    Stage 5  GTM / GA4 / Meta Pixel docs, analytics testing, redeploy,
+             final delivery
+
+Rule: nothing from Part B (dataLayer, GTM, GA4, Meta Pixel, data-gtm
+attributes, VITE_GTM_ID, src/analytics/) is created before the Stage 3
+milestone is reached.
 
 Starting point (already in the repo)
 ------------------------------------
-- Vite 8 + React 19 + TypeScript 6 scaffold (npm, oxlint).
-- Default template files: src/App.tsx, src/App.css, src/index.css, src/assets/*.
+- Vite 8 + React 19 + TypeScript 6 scaffold, npm, ESLint 10
+  (typescript-eslint, react-hooks, react-refresh) + Prettier
+  (no semicolons, single quotes, trailing commas es5, 2 spaces).
+- Git initialized, remote is set, initial commit is pushed to main
+- Default template files: src/App.tsx, src/App.css, src/index.css,
+  src/assets/*, public/icons.svg.
 - Assets in tech_details/:
     cream.png, serum.png, cleanser.png, sunscreen.png  (1024x1024 product shots)
     woman.PNG                                          (1672x941 hero image)
@@ -23,84 +43,75 @@ Starting point (already in the repo)
 1. Architecture overview
 ------------------------
 
+Part A (Stages 1–3):
+
   User action (click, form submit, route change)
         |
         v
-  React component / hook  --->  src/analytics/track*.ts helpers
-                                        |
-                                        v
-                            window.dataLayer.push({ event, ecommerce })
-                                        |
-                                        v
-                         Google Tag Manager (loaded only if GTM ID is set)
-                                |                       |
-                                v                       v
-                         GA4 event tags          Meta Pixel tags
-                     (Measurement ID in GTM)  (Pixel ID in GTM)
+  React component  --->  CartContext actions / router.navigate()
+        |
+        v
+  UI updates, cart saved to localStorage
+
+Part B (Stages 4–5) adds one layer, without changing Part A's structure:
+
+  CartContext actions / router / pages  --->  src/analytics/track.ts
+                                                      |
+                                                      v
+                                   window.dataLayer.push({ event, ecommerce })
+                                                      |
+                                                      v
+                                  Google Tag Manager -> GA4 tags, Meta tags
 
 Key decisions:
 
-a) No analytics code talks to GA4 or Meta directly. The site ONLY pushes to
-   window.dataLayer. All IDs (GA4 Measurement ID, Meta Pixel ID) live in GTM.
-
-b) One interaction = one dataLayer push. GA4 and Meta tags in GTM both listen
-   to the same event (e.g. "add_to_cart" -> GA4 add_to_cart + Meta AddToCart).
-
-c) Routing: a tiny custom router (~40 lines, History API: pushState +
-   popstate) instead of react-router. Keeps dependencies minimal and gives us
-   ONE place where every route change happens — which is exactly where the
-   SPA page_view is pushed.
+a) Routing: a tiny custom router (~40 lines, History API: pushState +
+   popstate) instead of react-router. Keeps dependencies minimal and gives
+   ONE place where every route change happens (useful later for page_view).
    Routes:
      /                 Home (hero, catalog, benefits)
      /product/:id      Product details
      /cart             Shopping cart
      /checkout         Checkout form
      /confirmation     Order confirmation
+   The router must respect Vite's base path (import.meta.env.BASE_URL),
+   because GitHub Pages serves the site from /<repo-name>/.
 
-d) page_view strategy (chosen once, used everywhere):
-   - The site pushes {event: "page_view", page_path, page_title, page_location}
-     on initial load AND on every route change, from the router only.
-   - In GTM the Google tag is configured with send_page_view = false, and GA4
-     Enhanced Measurement "page changes based on browser history events" is
-     turned OFF. A GA4 event tag "page_view" + Meta "PageView" fire on the
-     custom event "page_view". Result: exactly one page_view per view.
+b) State: React Context + useReducer for the cart (CartProvider + useCart
+   hook), persisted to localStorage. No Redux. Cart changes go through
+   named action functions (addToCart, removeFromCart, ...), never raw
+   dispatch from components — this is good structure on its own and is
+   also where Stage 4 will hook in analytics.
 
-e) State: React Context + useReducer for the cart (CartProvider + useCart
-   hook), persisted to localStorage. No Redux.
+c) React StrictMode stays ON.
 
-f) GTM ID configuration: environment variable VITE_GTM_ID in a .env file
-   (template in .env.example). A small inline Vite plugin in vite.config.ts
-   injects the OFFICIAL GTM snippets (<head> script + <body> noscript iframe)
-   into index.html at build/dev time ONLY when VITE_GTM_ID matches
-   /^GTM-[A-Z0-9]+$/ and is not the placeholder GTM-XXXXXXX. Without a valid
-   ID nothing is injected and the site works normally. No React component
-   ever contains the ID.
+d) Privacy by design from day one: the checkout form data is validated
+   in the browser only, never sent anywhere and never stored. The stored
+   Order contains only products, totals, transaction id and the delivery
+   METHOD id.
 
-g) React StrictMode stays ON. Because StrictMode runs effects twice in dev,
-   analytics events are pushed from event handlers or the router where
-   possible; any effect-based event (view_item_list, purchase) is protected
-   by a ref / localStorage guard so it fires once.
+e) Hosting: GitHub Pages, built and deployed by a GitHub Actions workflow
+   (free, HTTPS). Details in Stage 3.
 
-h) Privacy: dataLayer payloads never contain name, email, phone or delivery
-   address. Only product data, totals, transaction_id and the delivery
-   METHOD (a non-personal option like "nova_poshta").
+Decisions deferred to Part B (Stage 4): page_view strategy, GTM ID
+configuration via VITE_GTM_ID, dataLayer utility, data-gtm attributes.
 
 
-2. Proposed project structure
------------------------------
+2. Proposed project structure (Part A only)
+-------------------------------------------
 
-  .env.example                 VITE_GTM_ID=GTM-XXXXXXX (placeholder)
-  index.html                   lang="uk", title, fonts; GTM injected by plugin
-  vite.config.ts               react plugin + gtmInjectPlugin
+  index.html                   lang="uk", title, fonts
+  vite.config.ts               react plugin + base path for GitHub Pages
+  .github/workflows/deploy.yml GitHub Pages deploy (Stage 3)
   public/
     favicon.svg
-    _redirects                 Netlify SPA fallback: /*  /index.html  200
   src/
     main.tsx
     App.tsx                    providers + router outlet + layout
     router/
       router.ts                navigate(), current path, route matching
       useRoute.ts              hook returning current route + params
+      Link.tsx                 <a href> that navigates client-side
     data/
       products.ts              4 products (typed), formatPrice()
     types/
@@ -109,12 +120,6 @@ h) Privacy: dataLayer payloads never contain name, email, phone or delivery
       CartContext.tsx          CartProvider (useReducer + localStorage)
     hooks/
       useCart.ts               typed access to the cart context
-    analytics/
-      analyticsTypes.ts        GA4 item / event payload types
-      analyticsConfig.ts       on/off flags for optional custom events
-      dataLayer.ts             initDataLayer, pushEvent, pushEcommerceEvent
-      ecommerce.ts             toGa4Item(), buildItems(), calcValue()
-      track.ts                 trackAddToCart(), trackPurchase(), ... helpers
     components/
       Header.tsx               logo, nav, cart icon + count
       Footer.tsx
@@ -141,8 +146,10 @@ h) Privacy: dataLayer payloads never contain name, email, phone or delivery
     styles/
       global.css               design tokens (CSS variables), base, layout
       (+ *.module.css per component where styles grow)
-  README.md                    full beginner guide (Stage 4)
-  docs/                        optional: long GTM guides split out of README
+  README.md                    basic README (run / build / deploy) in Stage 3
+
+Added later in Part B: src/analytics/*, .env.example, GTM plugin in
+vite.config.ts, docs/*.
 
 
 3. Package list
@@ -154,12 +161,13 @@ Runtime dependencies:
 
 Dev dependencies (already installed — no new ones required):
   vite, @vitejs/plugin-react, typescript, @types/react, @types/react-dom,
-  @types/node, oxlint
+  @types/node, eslint + plugins, prettier
 
 Intentionally NOT added: react-router, redux/zustand, UI kits, form
-libraries, gtag.js / react-ga4 / react-facebook-pixel, a test runner.
-(Testing is a manual checklist + a dev-mode dataLayer console logger. Vitest
-can be added later if automated tests are wanted.)
+libraries, any analytics library (gtag.js / react-ga4 /
+react-facebook-pixel — never, even in Part B), a test runner.
+(Testing is a manual checklist. Vitest can be added later if automated
+tests are wanted.)
 
 
 4. Tasks in this stage
@@ -176,11 +184,12 @@ can be added later if automated tests are wanted.)
 [ ] index.html: lang="uk", <title>Glow Care — догляд за шкірою</title>,
     meta description, Google Fonts (serif for headings, e.g. "Cormorant
     Garamond" or "Lora"; sans for body, e.g. "Inter" — both support Cyrillic).
-[ ] Add .env.example with VITE_GTM_ID=GTM-XXXXXXX; add .env to .gitignore.
 [ ] Define design tokens in global.css:
       --color-bg #F7F2EC, --color-surface #FFFFFF, --color-cream #EFE6DC,
       --color-text #2B2420, --color-muted #7A6E66, --color-accent #3A2E28,
       --radius, --shadow, spacing scale, breakpoints 640 / 960 px.
+[ ] Make sure tech_details/ is not part of the build (it is outside src/
+    and public/, so Vite ignores it).
 [ ] `npm run dev`, `npm run build`, `npm run lint` all pass.
 
 Definition of done
@@ -188,3 +197,4 @@ Definition of done
 - Plan approved.
 - Clean scaffold builds and lints with zero errors.
 - Folder structure and tokens in place; images optimized and imported.
+- No analytics-related files or code exist.

@@ -1,144 +1,114 @@
-STAGE 3 — dataLayer IMPLEMENTATION AND GTM INSTALLATION HOOK
-=============================================================
+STAGE 3 — FUNCTIONAL TESTING AND DEPLOYMENT TO GITHUB
+======================================================
 
 Goal
 ----
-Push every required interaction into window.dataLayer with correct, typed
-GA4 ecommerce payloads; install GTM via the official snippet when (and only
-when) a GTM ID is configured. No direct GA4 / Meta calls anywhere.
+Verify the analytics-free store works end to end, put the code on GitHub
+and publish it on GitHub Pages (free HTTPS). This is the MILESTONE that
+closes Part A: a live, fully working store with zero tracking.
+Analytics work (Stage 4) starts only after this stage is done.
 
 
-3.1 GTM installation (configurable, safe when missing)
-------------------------------------------------------
-.env.example
-  # Paste your container ID from tagmanager.google.com, e.g. GTM-AB12CDE
-  VITE_GTM_ID=GTM-XXXXXXX
+3.1 Functional testing (spec §13) — run in Chrome + one mobile viewport
+-----------------------------------------------------------------------
+Run locally first (npm run dev), then again on the live GitHub Pages URL.
+[ ]  1 Homepage loads, no console errors.
+[ ]  2 Catalog shows all 4 products with correct names/prices in UAH.
+[ ]  3 "Детальніше" opens /product/:id with correct data; direct URL works.
+[ ]  4 Products can be added (card and details page, with quantity).
+[ ]  5 Quantity +/− works in cart; header badge updates live.
+[ ]  6 Remove works; empty state appears when last item removed.
+[ ]  7 Totals correct (e.g. 2×450 + 1×620 = 1 520 ₴).
+[ ]  8 Cart persists after F5 / closing tab.
+[ ]  9 Checkout shows field errors for empty / invalid email / invalid phone
+       / no delivery / unchecked terms.
+[ ] 10 Invalid form cannot be submitted.
+[ ] 11 Valid demo order completes.
+[ ] 12 Confirmation shows transaction ID, items, correct total.
+[ ] 13 Cart empty after purchase.
+[ ] 14 Refresh on /confirmation shows the same order (no new order, no
+       error). (Purchase-event de-dup is tested in Stage 5.)
+Extra: /checkout with empty cart redirects to /cart; unknown route -> 404;
+back/forward buttons work; keyboard-only navigation works; refresh on
+/product/cream_001 and /cart works on the LIVE site.
 
-vite.config.ts — inline plugin `gtmPlugin()` using transformIndexHtml:
-  - reads VITE_GTM_ID via loadEnv(mode, process.cwd())
-  - if valid (/^GTM-[A-Z0-9]+$/ and !== "GTM-XXXXXXX"):
-      inject official GTM <script> as high in <head> as possible
-      inject official <noscript><iframe ...></noscript> right after <body>
-  - else: inject nothing, print a one-line console warning during build.
-The learner edits ONLY .env (locally) or the hosting env-var settings
-(Netlify). Rebuild/restart dev server after changing it.
-
-src/analytics/dataLayer.ts also does `window.dataLayer = window.dataLayer || []`
-so pushes never fail if GTM is absent or blocked by an ad blocker.
-
-
-3.2 Types — src/analytics/analyticsTypes.ts
--------------------------------------------
-  declare global { interface Window { dataLayer: DataLayerObject[] } }
-
-  Ga4Item         { item_id, item_name, item_category, price, quantity,
-                    index?, item_list_id?, item_list_name? }
-  EcommercePayload{ currency: "UAH", value: number, items: Ga4Item[],
-                    transaction_id?, shipping_tier?,
-                    item_list_id?, item_list_name? }
-  EcommerceEventName = "view_item_list" | "select_item" | "view_item" |
-                       "add_to_cart" | "remove_from_cart" | "view_cart" |
-                       "begin_checkout" | "add_shipping_info" | "purchase"
-  CustomEventName    = "page_view" | "click_cta" | "form_start" |
-                       "form_submit"
-  PageViewPayload    { page_path, page_location, page_title }
+Automated checks: `npm run lint` and `npm run build` (tsc type check) must
+pass with zero errors.
 
 
-3.3 Utility — src/analytics/dataLayer.ts
-----------------------------------------
-  initDataLayer()                       safe init (idempotent)
-  pushEvent(name, params?)              custom event
-  pushEcommerceEvent(name, ecommerce)   pushes { ecommerce: null } FIRST,
-                                        then { event, ecommerce }
-  Dev helper: when import.meta.env.DEV, console.log each push with a
-  "[dataLayer]" prefix so beginners can see events without GTM.
-  Optional guard: assertNoPii(payload) in DEV — warns if any value looks
-  like an email or phone number.
-
-src/analytics/ecommerce.ts
-  toGa4Item(product, quantity, index?)  -> Ga4Item
-  itemsValue(items)                     -> sum(price * quantity), rounded
-                                           to 2 decimals, number type
-
-src/analytics/analyticsConfig.ts
-  export const CUSTOM_EVENTS = { click_cta: true, form_start: true,
-                                 form_submit: true }
-  (spec §8: optional events, easy to enable/disable in one place)
-
-src/analytics/track.ts — one small function per event; components call
-these, never window.dataLayer directly.
+3.2 Git and GitHub repository
+-----------------------------
+1. Check .gitignore: node_modules, dist, .env, *.local, .DS_Store,
+   .idea are ignored. Decide about tech_details/ (recommended: ignore the
+   large images, keep the .md/.txt planning files).
+2. git init, git add, first commit ("Glow Care demo store — no analytics").
+3. Create the GitHub repository (public — GitHub Pages is free for public
+   repos), e.g. "skin-care-demo":
+     - GitHub CLI: `brew install gh`, `gh auth login`, then
+       `gh repo create skin-care-demo --public --source=. --push`
+       (gh is NOT installed on this machine yet), or
+     - GitHub web UI: New repository -> then `git remote add origin ...`
+       and `git push -u origin main`.
+4. Tag the milestone: `git tag v1.0-no-analytics` and push the tag, so the
+   analytics-free version is always easy to return to and compare against.
 
 
-3.4 Event wiring (where each push happens)
+3.3 Deployment — GitHub Pages via GitHub Actions
+------------------------------------------------
+Why public HTTPS matters (also for Part B): Meta Pixel Helper / Events
+Manager, GA4 and Tag Assistant work best on a real public URL; teammates
+can test; same setup as real sites.
+
+a) Base path. The site is served from https://<user>.github.io/<repo>/.
+   vite.config.ts: base = process.env.BASE_PATH ?? "/"  (so local dev stays
+   at "/"; the workflow sets BASE_PATH=/<repo>/). The router already uses
+   import.meta.env.BASE_URL (Stage 2 §2.2).
+
+b) SPA fallback. GitHub Pages has no rewrite rules, so a refresh on
+   /<repo>/product/cream_001 would 404. Use the standard trick:
+   - public/404.html: a tiny script that saves the requested path
+     (location.pathname + search + hash) to sessionStorage and redirects
+     to the base URL;
+   - the router (Stage 2 §2.2) restores it on startup with replaceState.
+   Simpler alternative: copy dist/index.html to dist/404.html in the
+   workflow (works, but the response status is 404 — acceptable for a
+   demo; pick one approach and document it).
+
+c) .github/workflows/deploy.yml (official Pages actions):
+     on: push to main + workflow_dispatch
+     permissions: contents read, pages write, id-token write
+     job build: actions/checkout, actions/setup-node (LTS, cache npm),
+                npm ci, npm run lint, npm run build with
+                BASE_PATH=/${{ github.event.repository.name }}/,
+                actions/upload-pages-artifact (path: dist)
+     job deploy: actions/deploy-pages, environment github-pages
+   Stage 4 will add one env line here for VITE_GTM_ID — nothing else.
+
+d) Repository -> Settings -> Pages -> Source: "GitHub Actions".
+
+e) Push to main -> Actions tab shows the run -> site is live at
+   https://<user>.github.io/<repo>/. Put the URL in the repo "About" box.
+
+Alternatives (short note in README): Netlify / Vercel (connect the same
+GitHub repo; base path "/", SPA rewrite instead of 404.html).
+
+
+3.4 Basic README (Part A version, English)
 ------------------------------------------
-Event              Fired from                         Payload notes
------------------  ---------------------------------  ---------------------------
-page_view          router: initial load + every       page_path, page_location,
-                   navigate()/popstate (only place)   page_title (title updated
-                                                      BEFORE push)
-view_item_list     ProductGrid, IntersectionObserver  item_list_id "catalog",
-                   when #catalog is ≥50% visible,     item_list_name
-                   once per page view (ref guard)     "Каталог", all 4 items
-                                                      with index
-select_item        "Детальніше" click / card image    1 item + list id/name
-                   click (before navigating)
-view_item          ProductPage on product change      1 item, quantity 1,
-                   (guarded by ref keyed on id)       value = price
-add_to_cart        CartContext.addToCart() and        item with ADDED qty,
-                   increment (+)                      value = price * added qty
-remove_from_cart   CartContext.removeFromCart() and   item with REMOVED qty,
-                   decrement (−)                      value accordingly
-view_cart          CartPage on open (guarded)         all lines, cart total
-                   (empty cart -> skip)
-begin_checkout     CheckoutPage on open with          all lines, cart total
-                   non-empty cart (guarded)
-add_shipping_info  delivery radio change (once per    all lines, total,
-                   distinct method per checkout)      shipping_tier = method id
-purchase           ConfirmationPage — see 3.5         transaction_id, value,
-                                                      currency, items
-click_cta          Hero CTA click                     cta_text, cta_location
-form_start         first focus/input in checkout      form_name
-                   form (once per checkout visit)     "checkout"
-form_submit        after validation passes, before    form_name "checkout"
-                   navigating to confirmation         (NO field values)
+- What the project is (educational demo store; analytics added in Part B).
+- Technologies used.
+- Install Node.js LTS (nodejs.org) and check `node -v`, `npm -v`.
+- npm install / npm run dev (-> http://localhost:5173) / npm run build
+  (-> dist/) / npm run preview.
+- How deployment works (GitHub Actions -> GitHub Pages), how to enable
+  Pages in a fork, live URL.
+- Project structure overview.
+The README is extended with all analytics topics in Stage 5.
 
 
-3.5 Purchase de-duplication
----------------------------
-1. On valid submit the Order is saved as "glowcare_last_order".
-2. ConfirmationPage effect:
-     const tracked = read("glowcare_tracked_transactions")  // string[]
-     if (!tracked.includes(order.transactionId)) {
-       write(tracked + id)        // mark FIRST (StrictMode / fast refresh)
-       trackPurchase(order)
-     }
-3. Refreshing /confirmation, going back/forward, or StrictMode double
-   effects -> already tracked -> no second push.
-4. Opening /checkout or submitting an invalid form never reaches this code.
-Keep the tracked list trimmed (e.g. last 20 ids).
-
-
-3.6 Privacy rules (enforced in code review)
--------------------------------------------
-- track.ts functions accept products/orders only — there is no parameter
-  through which name, email or phone could be passed.
-- Order stored in localStorage contains no personal fields.
-- delivery method is sent as an id ("nova_poshta"), not an address.
-
-
-3.7 Inspecting the dataLayer (to document in README)
-----------------------------------------------------
-- DevTools Console: type `dataLayer` and press Enter; expand entries.
-- `dataLayer.filter(e => e.event)` to see only events.
-- In dev mode watch the "[dataLayer]" console logs.
-- With GTM installed: GTM Preview / Tag Assistant shows each push on the
-  left timeline.
-
-
-Definition of done
-------------------
-- With NO GTM ID: site works, dataLayer fills, no errors, no GTM requests.
-- With a GTM ID: gtm.js loads (Network tab), noscript iframe present.
-- Every event in 3.4 appears exactly once per interaction, each ecommerce
-  push is preceded by { ecommerce: null }, values are numbers, currency UAH.
-- No PII in any push (manual check with a test order).
+Definition of done (= Part A milestone)
+---------------------------------------
+- All functional checks pass locally AND on the live URL.
+- Code is on GitHub, tagged v1.0-no-analytics.
+- Every push to main redeploys automatically; site is live on HTTPS.
+- Still no analytics code anywhere in the repository.

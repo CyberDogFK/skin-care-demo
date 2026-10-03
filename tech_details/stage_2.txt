@@ -18,32 +18,60 @@ Decisions (agreed before starting)
 - Quantity: selector 1–10 on the product page; NO limit in the cart.
 - Phone: spaces, dashes and brackets allowed ("+380 (67) 123-45-67"),
   stripped before validation.
-- Commits: pause at 4 checkpoints and propose commits (see Progress).
+- Commits: checkpoint 1 committed separately; after that the user chose
+  to build the rest of Stage 2 first and propose all commits at the end.
 
 Progress
 --------
-Legend: [x] done   [ ] open
-Checkpoint 1 — data, router, cart, theme
+Legend: [x] done   [ ] open   [~] needs manual check by the user
+Checkpoint 1 — data, router, cart, theme (committed)
   [x] 2.1 types/shop.ts, data/products.ts, data/delivery.ts
   [x] 2.2 router/router.ts, router/useRoute.ts, router/Link.tsx
   [x] 2.3 context/CartContext.ts + context/CartProvider.tsx, hooks/useCart.ts
   [x] 2.4 context/ThemeContext.ts + context/ThemeProvider.tsx,
           hooks/useTheme.ts, components/ThemeToggle.tsx
-  [x] Temporary test page in App.tsx (removed at checkpoint 2)
+  [x] Temporary test page in App.tsx (removed)
   [x] lint + build clean
-Checkpoint 2 — layout and home page
-  [ ] 2.5 Header, Footer, App layout + route outlet
-  [ ] 2.6 HomePage: Hero (+ floating serum card), ProductGrid,
-          ProductCard ("Додано в кошик"), Benefits
-Checkpoint 3 — remaining pages
-  [ ] ProductPage + ProductDetails + QuantitySelector
-  [ ] CartPage + Cart (empty state)
-  [ ] CheckoutPage + CheckoutForm + OrderSummary
-  [ ] ConfirmationPage + OrderConfirmation, NotFoundPage
-Checkpoint 4 — polish and testing
-  [ ] 2.7 responsive + dark theme polish
-  [ ] Definition of done checks (below)
+Layout and home page
+  [x] 2.5 Header (compact on phones, cart badge, theme toggle), Footer,
+          App layout: skip link, <main> route outlet keyed by path
+  [x] 2.6 HomePage: Hero (+ floating serum card), ProductGrid,
+          ProductCard, AddToCartButton ("Додано в кошик" for 2 s), Benefits
+Remaining pages
+  [x] ProductPage + ProductDetails + QuantitySelector (1–10)
+  [x] CartPage + Cart (+/−, remove, totals, empty state)
+  [x] CheckoutPage + CheckoutForm + OrderSummary (shared with confirmation)
+  [x] ConfirmationPage + OrderConfirmation, NotFoundPage, EmptyState
+Shared helpers
+  [x] utils/orders.ts (transaction id, create/save/load order),
+      utils/validation.ts, utils/plural.ts, hooks/useTemporaryFlag.ts
+  [x] global.css: .btn / .btn-primary / .btn-outline / .icon-btn / .pill,
+      .page, .page-title, .skip-link, hero tokens (--color-on-photo,
+      --hero-overlay), scroll-margin for anchors under the sticky header
+Polish and testing
+  [x] 2.7 responsive + dark theme polish — checked with headless Chrome
+      screenshots: home 1280/768/375, product, cart (filled + empty),
+      checkout 1280 + 375, confirmation, all in light and dark
+  [x] Fixes found by screenshots: stronger hero overlay on phones (white
+      text over the towel), floating-card image no longer stretches,
+      smaller page titles, "Товари (N шт.)" label
+  [x] Validation rules tested with 21 sample inputs (all as expected)
+  [x] Base path: build with --base=/skin-care-demo/, deep URL
+      /skin-care-demo/product/cream_001 renders with images
+  [x] lint, build, Prettier clean; grep for dataLayer/gtm/gtag/fbq and
+      data-gtm / data-item-id in src/ returns nothing
+  [~] Click-through flows (not automatable here): add/+/−/remove,
+      checkout validation messages and focus, valid order -> confirmation
+      -> cart empty, refresh on /confirmation, back/forward, keyboard-only
   [ ] Git: all work pushed to main, tag v0.2-website (user's command)
+
+Notes
+-----
+- Prices: browsers format UAH as "450 грн" (Node shows "450 ₴"); both are
+  correct uk-UA output of Intl.NumberFormat — no change needed.
+- Hero label uses semi-transparent white (rgb 255 255 255 / 0.15) — a
+  deliberate exception to "tokens only": it sits on the photo, which looks
+  the same in both themes.
 
 Design reference: tech_details/telegram-cloud-photo-...jpg
 (warm beige background, serif headings, small pill labels, dark-brown pill

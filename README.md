@@ -1,75 +1,62 @@
-# React + TypeScript + Vite
+# Glow Care Demo Store
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An educational demo online store for skincare products, built to practice
+**Google Tag Manager**, **Google Analytics 4** and **Meta Pixel** setup.
 
-Currently, two official plugins are available:
+Visitors can browse products, add them to a cart, go through checkout and
+complete a simulated purchase. The site is in Ukrainian and prices are in UAH.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+> This is a demo for learning only. It takes no real orders or payments and
+> stores no customer data.
 
-## React Compiler
+**Status:** in development. Analytics tracking will be added after the store
+itself is finished and deployed.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Technologies
 
-## Expanding the ESLint configuration
+- React + TypeScript
+- Vite (development server and build)
+- CSS with design tokens (light and dark theme)
+- Lucide React (icons)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Run locally
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 1. Install Node.js
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Install Node.js **22 LTS** (or 20.19+) from [nodejs.org](https://nodejs.org).
+Check the versions in a terminal:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+node -v
+npm -v
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Get the project
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+git clone git@github.com:CyberDogFK/skin-care-demo.git
+cd skin-care-demo
 ```
+
+### 3. Install dependencies
+
+```bash
+npm install
+```
+
+### 4. Start the development server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser. The page
+reloads automatically when you change the code.
+
+## Other commands
+
+| Command           | What it does                                   |
+| ----------------- | ---------------------------------------------- |
+| `npm run build`   | Builds the production version into `dist/`     |
+| `npm run preview` | Serves the production build locally to test it |
+| `npm run lint`    | Checks the code for errors with ESLint         |

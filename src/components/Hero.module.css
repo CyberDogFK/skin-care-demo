@@ -1,0 +1,167 @@
+.hero {
+  padding-top: var(--space-5);
+}
+
+.frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-5);
+  min-height: 600px;
+  padding: var(--space-5);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  isolation: isolate;
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 72% center;
+}
+
+/*
+ * Darkens the photo where the text is, so white text stays readable.
+ * Phone: text covers the whole photo (incl. the white towel), so the
+ * whole image is darkened, and the bottom a bit more.
+ */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to top, var(--hero-overlay) 35%, transparent 75%),
+    linear-gradient(var(--hero-overlay), var(--hero-overlay));
+}
+
+.content {
+  max-width: 560px;
+  color: var(--color-on-photo);
+}
+
+.label {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  padding: 2px var(--space-3);
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.15);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.title {
+  color: var(--color-on-photo);
+  font-size: clamp(2.25rem, 4vw + 1rem, 3.75rem);
+}
+
+.text {
+  max-width: 440px;
+  margin-bottom: var(--space-5);
+  opacity: 0.92;
+}
+
+/* Floating product card (like the design reference) */
+.card {
+  display: flex;
+  gap: var(--space-4);
+  max-width: 420px;
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+  transition: var(--transition-theme);
+}
+
+.cardImage {
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 96px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-cream);
+}
+
+.cardImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cardName {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.cardName a {
+  text-decoration: none;
+}
+
+.cardText {
+  margin: var(--space-1) 0 var(--space-3);
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.cardFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.cardPrice {
+  font-weight: 600;
+}
+
+.cardButton {
+  min-height: 36px;
+  padding-inline: var(--space-4);
+  font-size: 0.8125rem;
+}
+
+@media (min-width: 960px) {
+  .frame {
+    justify-content: center;
+    min-height: 560px;
+    padding: var(--space-8);
+  }
+
+  .image {
+    object-position: center;
+  }
+
+  .overlay {
+    background: linear-gradient(
+      to right,
+      var(--hero-overlay) 0%,
+      var(--hero-overlay) 30%,
+      transparent 70%
+    );
+  }
+
+  .card {
+    position: absolute;
+    right: var(--space-6);
+    bottom: var(--space-6);
+  }
+}

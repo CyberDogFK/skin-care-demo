@@ -31,6 +31,10 @@
   --color-error: #b3261e;
   --color-focus: #3a2e28;
 
+  /* Text on top of the hero photo (photo looks the same in both themes) */
+  --color-on-photo: #ffffff;
+  --hero-overlay: rgb(43 36 32 / 0.55);
+
   --shadow-sm: 0 1px 2px rgb(58 46 40 / 0.06);
   --shadow: 0 8px 24px rgb(58 46 40 / 0.08);
   --shadow-lg: 0 16px 40px rgb(58 46 40 / 0.12);
@@ -78,6 +82,8 @@
   --color-error: #f2a49c;
   --color-focus: #e9d9c6;
 
+  --hero-overlay: rgb(20 16 14 / 0.7);
+
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow: 0 8px 24px rgb(0 0 0 / 0.25);
   --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.35);
@@ -99,6 +105,8 @@
     --color-success: #7cc08e;
     --color-error: #f2a49c;
     --color-focus: #e9d9c6;
+
+    --hero-overlay: rgb(20 16 14 / 0.7);
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow: 0 8px 24px rgb(0 0 0 / 0.25);
@@ -205,7 +213,133 @@ button {
   outline-offset: 3px;
 }
 
+/* Focused only by the skip link — no visible ring needed */
+main:focus {
+  outline: none;
+}
+
+/* Anchored sections (#catalog) stop below the sticky header */
+[id] {
+  scroll-margin-top: 88px;
+}
+
 /* ---------- Shared helpers ---------- */
+
+.page {
+  padding-block: var(--space-7) var(--space-9);
+}
+
+.page-title {
+  margin-bottom: var(--space-6);
+  font-size: clamp(2rem, 3vw + 1rem, 3rem);
+}
+
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* Small rounded label, e.g. product category */
+.pill {
+  display: inline-block;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-cream);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    var(--transition-theme),
+    transform 150ms ease,
+    opacity 150ms ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.btn-primary:hover {
+  opacity: 0.88;
+}
+
+.btn-outline {
+  border-color: var(--color-text);
+  background: transparent;
+  color: var(--color-text);
+}
+
+.btn-outline:hover {
+  background: var(--color-cream);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* Round icon-only button (+, −, trash) */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: var(--transition-theme);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--color-cream);
+}
+
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
 
 .container {
   width: 100%;

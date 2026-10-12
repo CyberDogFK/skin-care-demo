@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Glow Care</title>
+    <!--
+      GitHub Pages SPA fallback.
+
+      GitHub Pages has no rewrite rules, so a refresh on
+      /skin-care-demo/product/cream_001 serves this file instead of the app.
+      We save the requested URL and go to the site root; on startup the
+      router (src/router/router.ts) reads it back and restores it with
+      history.replaceState, so the user sees the page they asked for.
+
+      The base is the first path segment ("/<repo>/"), because the site is
+      served as a GitHub Pages project site: https://<user>.github.io/<repo>/
+    -->
+    <script>
+      ;(function () {
+        var l = window.location
+        var base = '/' + (l.pathname.split('/')[1] || '')
+        if (base !== '/') base += '/'
+        try {
+          // Same key as REDIRECT_KEY in src/router/router.ts
+          sessionStorage.setItem(
+            'glowcare_redirect',
+            l.pathname + l.search + l.hash,
+          )
+        } catch (e) {
+          // sessionStorage blocked: the user simply lands on the home page
+        }
+        l.replace(base)
+      })()
+    </script>
+  </head>
+  <body></body>
+</html>
